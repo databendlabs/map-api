@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Provides a simple in-memory implementation of the Map API.
+//!
+//! The [`Level`] struct is a basic implementation of the [`MapApi`] trait
+//! that stores key-value pairs in memory using a [`BTreeMap`]. It's primarily
+//! intended for testing and demonstration purposes.
+
 use std::collections::BTreeMap;
 use std::io;
 use std::ops::RangeBounds;
@@ -27,9 +33,49 @@ use crate::Marked;
 use crate::MarkedOf;
 use crate::Transition;
 
-/// Level is a seq and key-value store.
+/// A simple in-memory implementation of the Map API using a BTreeMap.
 ///
-/// This is only used for testing.
+/// This implementation stores key-value pairs in memory and maintains a sequence
+/// number for versioning. It's primarily intended for testing and demonstration
+/// purposes, not for production use.
+///
+/// # Type Parameters
+///
+/// - `M`: The metadata type associated with values, defaults to `()`
+///
+/// # Implementation Details
+///
+/// The `Level` struct contains:
+/// - A sequence counter (`u64`) for assigning sequence numbers to entries
+/// - A [`BTreeMap`] for storing key-value pairs
+///
+/// # Examples
+///
+/// ```
+/// use std::io;
+///
+/// use map_api::impls::level::Level;
+/// use map_api::MapApi;
+/// use map_api::MapApiRO;
+///
+/// #[tokio::main]
+/// async fn main() -> io::Result<()> {
+///     // Create a new Level instance
+///     let mut map = Level::<()>::default();
+///
+///     // Set a value
+///     map.set(
+///         "key1".to_string(),
+///         Some(("value1".as_bytes().to_vec(), None)),
+///     )
+///     .await?;
+///
+///     // Get the value
+///     let value = map.get(&"key1".to_string()).await?;
+///
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct Level<M = ()>(u64, BTreeMap<String, Marked<M>>);
 
@@ -45,6 +91,10 @@ impl<M> Level<M> {
 impl<M> MapApiRO<String, M> for Level<M>
 where M: Clone + Send + Sync + 'static
 {
+    /// Get a value by key.
+    ///
+    /// Retrieves the value associated with the given key from the in-memory store.
+    /// If the key doesn't exist, returns an empty `Marked` value.
     async fn get(&self, key: &String) -> Result<MarkedOf<String, M>, io::Error> {
         let got = self.1.get(key).cloned().unwrap_or(Marked::empty());
         Ok(got)

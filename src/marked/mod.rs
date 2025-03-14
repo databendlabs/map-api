@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Defines the `Marked` enum for representing values with metadata and tombstones.
+//!
+//! This module provides the core value representation used throughout the library.
+//! The `Marked` enum can represent both normal values with metadata and tombstones
+//! (deleted values), which is essential for replication and synchronization in
+//! distributed systems.
+
 #[cfg(test)]
 mod marked_test;
 
@@ -23,20 +30,64 @@ pub(crate) use seq_tombstone::SeqTombstone;
 use crate::seq_value::SeqV;
 use crate::seq_value::SeqValue;
 
-/// A versioned value wrapper that can mark the value as deleted.
+/// A versioned value wrapper that can represent both normal values and tombstones (deleted values).
 ///
-/// This `internal_seq` is used internally and is different from the seq in `SeqV`,
-/// which is used by application.
-/// A deleted tombstone also have `internal_seq`, while for an application, deleted entry has seq=0.
-/// A normal entry(non-deleted) has a positive `seq` that is same as the corresponding `internal_seq`.
+/// The `Marked` enum is a core type in this library that wraps values with:
+/// - A sequence number for versioning
+/// - Optional metadata
+/// - Support for representing deleted values (tombstones)
+///
+/// This type is essential for implementing distributed key-value stores where
+/// tracking deletions is as important as tracking additions and updates.
+///
+/// # Sequence Numbers
+///
+/// The `internal_seq` field is used internally and is different from the `seq` in `SeqV`,
+/// which is used by the application:
+/// - A normal entry (non-deleted) has a positive `seq` that is the same as the corresponding `internal_seq`
+/// - A deleted tombstone also has an `internal_seq`, while for an application, a deleted entry has `seq=0`
+///
+/// # Type Parameters
+///
+/// - `M`: The metadata type associated with values
+/// - `T`: The value type, defaults to `Vec<u8>`
+///
+/// # Examples
+///
+/// ```
+/// use map_api::Marked;
+///
+/// // Create a normal value
+/// let normal = Marked::<(), Vec<u8>>::new_normal(1, vec![1, 2, 3]);
+///
+/// // Create a tombstone (deleted value)
+/// let tombstone = Marked::<(), Vec<u8>>::new_tombstone(2);
+///
+/// // Check if a value is a tombstone
+/// assert!(!normal.is_tombstone());
+/// assert!(tombstone.is_tombstone());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Marked<M, T = Vec<u8>> {
+    /// Represents a deleted value (tombstone).
+    ///
+    /// A tombstone is used to mark a key as deleted while preserving its
+    /// sequence number for replication and synchronization purposes.
     TombStone {
+        /// The internal sequence number of the tombstone.
         internal_seq: u64,
     },
+
+    /// Represents a normal (non-deleted) value.
+    ///
+    /// A normal value contains the actual value data, its sequence number,
+    /// and optional metadata.
     Normal {
+        /// The internal sequence number of the value.
         internal_seq: u64,
+        /// The actual value data.
         value: T,
+        /// Optional metadata associated with the value.
         meta: Option<M>,
     },
 }

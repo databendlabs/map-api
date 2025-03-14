@@ -12,6 +12,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! # Map API
+//!
+//! A map-like API with set, get and range operations, designed for use in Raft state machines.
+//!
+//! This library provides a consistent interface for key-value storage with additional features
+//! such as sequence numbers, expirable entries, and tombstone support for deleted entries.
+//!
+//! ## Core Components
+//!
+//! - [`MapApiRO`]: Read-only operations for key-value access
+//! - [`MapApi`]: Read-write operations extending [`MapApiRO`]
+//! - [`Marked`]: A wrapper for values that can represent both normal values and tombstones
+//!
+//! ## Usage Example
+//!
+//! ```rust,no_run
+//! use std::io;
+//!
+//! use futures_util::StreamExt;
+//! use map_api::impls::level::Level;
+//! use map_api::MapApi;
+//! use map_api::MapApiRO;
+//! use map_api::Marked;
+//!
+//! #[tokio::main]
+//! async fn main() -> io::Result<()> {
+//!     // Create a map instance
+//!     let mut map = Level::<()>::default();
+//!
+//!     // Set a value
+//!     map.set(
+//!         "key1".to_string(),
+//!         Some(("value1".as_bytes().to_vec(), None)),
+//!     )
+//!     .await?;
+//!
+//!     // Get a value
+//!     let value = map.get(&"key1".to_string()).await?;
+//!
+//!     // Range scan
+//!     let mut range = map.range("".to_string()..).await?;
+//!     while let Some(result) = range.next().await {
+//!         let (key, value) = result?;
+//!         // Process key-value pairs
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+
 use std::io;
 
 use futures_util::stream::BoxStream;
