@@ -76,6 +76,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
+
+      - name: Check Apache License Header
+        uses: korandoru/hawkeye@v2
+
+
       - name: Format
         uses: actions-rs/cargo@v1
         with:
