@@ -24,4 +24,7 @@ mod update;
 
 pub use seq_value_trait::SeqValue;
 pub use seqv::SeqV;
-pub use update::Update;
+pub use update::Change;
+
+#[deprecated(since = "0.2.0", note = "Use `Change` instead")]
+pub type Update<M, V = Vec<u8>> = Change<M, V>;

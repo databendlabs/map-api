@@ -16,13 +16,13 @@ use crate::seq_value::SeqV;
 
 /// An update event for a key.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Update<M, V = Vec<u8>> {
+pub struct Change<M, V = Vec<u8>> {
     pub key: String,
     pub before: Option<SeqV<M, V>>,
     pub after: Option<SeqV<M, V>>,
 }
 
-impl<M, V> Update<M, V> {
+impl<M, V> Change<M, V> {
     pub fn new(key: String, before: Option<SeqV<M, V>>, after: Option<SeqV<M, V>>) -> Self {
         Self { key, before, after }
     }
