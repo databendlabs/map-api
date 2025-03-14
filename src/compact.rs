@@ -22,6 +22,7 @@ use stream_more::StreamMore;
 use crate::util;
 use crate::MapApiRO;
 use crate::MapKey;
+use crate::Marked;
 
 /// Get a key from multi levels data.
 ///
@@ -58,7 +59,7 @@ where
         }
     }
 
-    Ok(crate::Marked::empty())
+    Ok(Marked::empty())
 }
 
 /// Iterate over a range of entries by keys from multi levels.
