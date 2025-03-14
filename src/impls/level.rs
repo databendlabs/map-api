@@ -25,13 +25,13 @@ use std::ops::RangeBounds;
 use futures_util::StreamExt;
 use log::warn;
 
+use crate::BeforeAfter;
 use crate::KVResultStream;
 use crate::MapApi;
 use crate::MapApiRO;
 use crate::MapKey;
 use crate::Marked;
 use crate::MarkedOf;
-use crate::Transition;
 
 /// A simple in-memory implementation of the Map API using a BTreeMap.
 ///
@@ -129,7 +129,7 @@ where M: Clone + Unpin + Send + Sync + 'static
         &mut self,
         key: String,
         value: Option<(<String as MapKey<M>>::V, Option<M>)>,
-    ) -> Result<Transition<MarkedOf<String, M>>, io::Error> {
+    ) -> Result<BeforeAfter<MarkedOf<String, M>>, io::Error> {
         // The chance it is the bottom level is very low in a loaded system.
         // Thus, we always tombstone the key if it is None.
 

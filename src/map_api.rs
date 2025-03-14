@@ -22,7 +22,7 @@ use std::io;
 
 use crate::map_api_ro::MapApiRO;
 use crate::map_key::MapKey;
-use crate::Transition;
+use crate::BeforeAfter;
 
 /// Provides a read-write key-value map API, used to access state machine data.
 ///
@@ -80,7 +80,7 @@ where
     ///
     /// # Returns
     ///
-    /// A [`Transition`] containing:
+    /// A [`BeforeAfter`] containing:
     /// - The old value (before the operation)
     /// - The new value (after the operation)
     ///
@@ -92,5 +92,5 @@ where
         &mut self,
         key: K,
         value: Option<(K::V, Option<M>)>,
-    ) -> Result<Transition<crate::MarkedOf<K, M>>, io::Error>;
+    ) -> Result<BeforeAfter<crate::MarkedOf<K, M>>, io::Error>;
 }

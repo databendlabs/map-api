@@ -84,9 +84,17 @@ pub use crate::map_key::MapKey;
 pub use crate::map_value::MapValue;
 pub use crate::marked::Marked;
 
+#[deprecated(since = "0.2.0", note = "Use `BeforeAfter` instead")]
+pub type Transition<T> = BeforeAfter<T>;
+
 /// Represents a transition from one state to another.
-/// The tuple contains the initial state and the resulting state.
-pub type Transition<T> = (T, T);
+///
+/// This type is a tuple containing two elements:
+/// - The first element represents the state before the transition (initial state)
+/// - The second element represents the state after the transition (resulting state)
+///
+/// It's commonly used to track changes in values or system states.
+pub type BeforeAfter<T> = (T, T);
 
 /// A boxed stream that yields `Result` of key-value pairs or an `io::Error`.
 /// The stream is 'static to ensure it can live for the entire duration of the program.
