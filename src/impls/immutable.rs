@@ -27,7 +27,7 @@ use crate::MarkedOf;
 /// Only used for testing.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct Immutable<M = ()> {
+pub struct Immutable<M = ()> {
     /// An in-process unique to identify this immutable level.
     ///
     /// It is used to assert an immutable level is not replaced after compaction.

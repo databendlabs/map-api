@@ -18,7 +18,7 @@ use futures_util::stream::BoxStream;
 
 pub mod compact;
 pub mod expirable;
-pub(crate) mod impls;
+pub mod impls;
 pub mod map_api;
 pub mod map_api_ro;
 pub mod map_key;

@@ -31,7 +31,7 @@ use crate::Transition;
 ///
 /// This is only used for testing.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Level<M = ()>(u64, BTreeMap<String, Marked<M>>);
+pub struct Level<M = ()>(u64, BTreeMap<String, Marked<M>>);
 
 impl<M> Level<M> {
     // Only used in tests
