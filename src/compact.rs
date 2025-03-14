@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Compact operations on multi levels data.
+
 use std::io;
 use std::ops::RangeBounds;
 

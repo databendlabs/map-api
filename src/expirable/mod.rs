@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Expirable trait for types that can have an expiration time.
+//!
+//! This module provides the `Expirable` trait which allows types to define
+//! and query their expiration time in milliseconds since the Unix epoch.
+//! It's used to implement time-to-live (TTL) functionality for stored values.
+
 /// A trait for evaluating and returning the absolute expiration time.
 pub trait Expirable {
     /// Returns the optional expiration time in milliseconds since the Unix epoch (January 1, 1970).

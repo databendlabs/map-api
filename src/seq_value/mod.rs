@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Sequenced values with metadata.
+//!
+//! This module provides traits and implementations for values that have an associated
+//! sequence number and optional metadata. These are used to track the ordering and
+//! lifecycle of values in storage systems.
+
 mod seq_value_trait;
 mod seqv;
 mod update;

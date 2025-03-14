@@ -12,5 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementations of the `MapApi` trait for different storage backends.
+
 pub mod immutable;
 pub mod level;
