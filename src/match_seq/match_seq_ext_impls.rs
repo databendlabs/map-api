@@ -37,15 +37,21 @@ impl<M, T> MatchSeqExt<SeqV<M, T>> for MatchSeq {
     }
 }
 
-impl<M, T> MatchSeqExt<Option<&SeqV<M, T>>> for MatchSeq {
-    fn match_seq(&self, sv: &Option<&SeqV<M, T>>) -> Result<(), ConflictSeq> {
-        let seq = sv.map_or(0, |sv| sv.seq);
-        self.match_seq(&seq)
+impl<T> MatchSeqExt<&T> for MatchSeq
+where MatchSeq: MatchSeqExt<T>
+{
+    fn match_seq(&self, sv: &&T) -> Result<(), ConflictSeq> {
+        self.match_seq(*sv)
     }
 }
 
-impl<M, T> MatchSeqExt<Option<SeqV<M, T>>> for MatchSeq {
-    fn match_seq(&self, sv: &Option<SeqV<M, T>>) -> Result<(), ConflictSeq> {
-        self.match_seq(&sv.as_ref())
+impl<T> MatchSeqExt<Option<T>> for MatchSeq
+where MatchSeq: MatchSeqExt<T>
+{
+    fn match_seq(&self, sv: &Option<T>) -> Result<(), ConflictSeq> {
+        match sv {
+            Some(sv) => self.match_seq(sv),
+            None => MatchSeqExt::<u64>::match_seq(self, &0u64),
+        }
     }
 }
