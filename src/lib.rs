@@ -74,6 +74,7 @@ pub mod map_api_ro;
 pub mod map_key;
 pub mod map_value;
 pub mod marked;
+pub mod match_seq;
 pub mod seq_value;
 pub mod util;
 
