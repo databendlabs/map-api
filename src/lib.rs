@@ -39,14 +39,11 @@
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {
 //!     // Create a map instance
-//!     let mut map = Level::<()>::default();
+//!     let mut map = Level::default();
 //!
 //!     // Set a value
-//!     map.set(
-//!         "key1".to_string(),
-//!         Some(("value1".as_bytes().to_vec(), None)),
-//!     )
-//!     .await?;
+//!     map.set("key1".to_string(), Some("value1".as_bytes().to_vec()))
+//!         .await?;
 //!
 //!     // Get a value
 //!     let value = map.get(&"key1".to_string()).await?;
@@ -67,23 +64,24 @@ use std::io;
 use futures_util::stream::BoxStream;
 
 pub mod compact;
-pub mod expirable;
 pub mod impls;
 pub mod map_api;
 pub mod map_api_ro;
 pub mod map_key;
 pub mod map_value;
-pub mod marked;
 pub mod match_seq;
 pub mod seq_value;
 pub mod util;
 
-pub use crate::expirable::Expirable;
+pub use seq_marked::Expirable;
+pub use seq_marked::SeqMarked;
+pub use seq_marked::SeqV;
+pub use seq_marked::SeqValue;
+
 pub use crate::map_api::MapApi;
 pub use crate::map_api_ro::MapApiRO;
 pub use crate::map_key::MapKey;
 pub use crate::map_value::MapValue;
-pub use crate::marked::SeqMarked;
 
 #[deprecated(since = "0.2.0", note = "Use `BeforeAfter` instead")]
 pub type Transition<T> = BeforeAfter<T>;
@@ -101,14 +99,19 @@ pub type BeforeAfter<T> = (T, T);
 /// The stream is 'static to ensure it can live for the entire duration of the program.
 pub type IOResultStream<T> = BoxStream<'static, Result<T, io::Error>>;
 
+/// The value type of a key type.
+pub type ValueOf<K> = <K as MapKey>::V;
+
 /// A Marked value type of key type.
 /// `M` represents the meta information associated with the value.
-pub type MarkedOf<K, M> = SeqMarked<M, <K as MapKey<M>>::V>;
+pub type SeqMarkedOf<K> = SeqMarked<<K as MapKey>::V>;
+// alias, for backward compat
+pub type MarkedOf<K> = SeqMarked<<K as MapKey>::V>;
 
 /// A key-value pair used in a map.
 /// `M` represents the meta information associated with the value.
-pub type MapKV<K, M> = (K, MarkedOf<K, M>);
+pub type MapKV<K> = (K, SeqMarkedOf<K>);
 
 /// A stream of result of key-value returned by `range()`.
 /// `M` represents the meta information associated with the value.
-pub type KVResultStream<K, M> = IOResultStream<MapKV<K, M>>;
+pub type KVResultStream<K> = IOResultStream<MapKV<K>>;

@@ -29,9 +29,9 @@ use crate::BeforeAfter;
 use crate::KVResultStream;
 use crate::MapApi;
 use crate::MapApiRO;
-use crate::MapKey;
-use crate::MarkedOf;
 use crate::SeqMarked;
+use crate::SeqMarkedOf;
+use crate::ValueOf;
 
 /// A simple in-memory implementation of the Map API using a BTreeMap.
 ///
@@ -61,14 +61,11 @@ use crate::SeqMarked;
 /// #[tokio::main]
 /// async fn main() -> io::Result<()> {
 ///     // Create a new Level instance
-///     let mut map = Level::<()>::default();
+///     let mut map = Level::default();
 ///
 ///     // Set a value
-///     map.set(
-///         "key1".to_string(),
-///         Some(("value1".as_bytes().to_vec(), None)),
-///     )
-///     .await?;
+///     map.set("key1".to_string(), Some(b"value1".to_vec()))
+///         .await?;
 ///
 ///     // Get the value
 ///     let value = map.get(&"key1".to_string()).await?;
@@ -77,9 +74,9 @@ use crate::SeqMarked;
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct Level<M = ()>(u64, BTreeMap<String, SeqMarked<M>>);
+pub struct Level<V = Vec<u8>>(u64, BTreeMap<String, SeqMarked<V>>);
 
-impl<M> Level<M> {
+impl<V> Level<V> {
     // Only used in tests
     #[allow(dead_code)]
     pub(crate) fn new_level(&self) -> Self {
@@ -88,19 +85,21 @@ impl<M> Level<M> {
 }
 
 #[async_trait::async_trait]
-impl<M> MapApiRO<String, M> for Level<M>
-where M: Clone + Send + Sync + 'static
-{
+impl MapApiRO<String> for Level<ValueOf<String>> {
     /// Get a value by key.
     ///
     /// Retrieves the value associated with the given key from the in-memory store.
     /// If the key doesn't exist, returns an empty `Marked` value.
-    async fn get(&self, key: &String) -> Result<MarkedOf<String, M>, io::Error> {
-        let got = self.1.get(key).cloned().unwrap_or(SeqMarked::empty());
+    async fn get(&self, key: &String) -> Result<SeqMarkedOf<String>, io::Error> {
+        let got = self
+            .1
+            .get(key)
+            .cloned()
+            .unwrap_or(SeqMarked::new_not_found());
         Ok(got)
     }
 
-    async fn range<R>(&self, range: R) -> Result<KVResultStream<String, M>, io::Error>
+    async fn range<R>(&self, range: R) -> Result<KVResultStream<String>, io::Error>
     where R: RangeBounds<String> + Clone + Send + Sync + 'static {
         // Level is borrowed. It has to copy the result to make the returning stream static.
         let vec = self
@@ -122,28 +121,30 @@ where M: Clone + Send + Sync + 'static
 }
 
 #[async_trait::async_trait]
-impl<M> MapApi<String, M> for Level<M>
-where M: Clone + Unpin + Send + Sync + 'static
-{
+impl MapApi<String> for Level<ValueOf<String>> {
     async fn set(
         &mut self,
         key: String,
-        value: Option<(<String as MapKey<M>>::V, Option<M>)>,
-    ) -> Result<BeforeAfter<MarkedOf<String, M>>, io::Error> {
+        value: Option<ValueOf<String>>,
+    ) -> Result<BeforeAfter<SeqMarkedOf<String>>, io::Error> {
         // The chance it is the bottom level is very low in a loaded system.
         // Thus, we always tombstone the key if it is None.
 
-        let marked = if let Some((v, meta)) = value {
+        let marked = if let Some(v) = value {
             self.0 += 1;
             let seq = self.0;
-            SeqMarked::new_with_meta(seq, v, meta)
+            SeqMarked::new_normal(seq, v)
         } else {
             // Do not increase the sequence number, just use the max seq for all tombstone.
             let seq = self.0;
             SeqMarked::new_tombstone(seq)
         };
 
-        let prev = self.1.get(&key).cloned().unwrap_or(SeqMarked::empty());
+        let prev = self
+            .1
+            .get(&key)
+            .cloned()
+            .unwrap_or(SeqMarked::new_not_found());
         self.1.insert(key, marked.clone());
         Ok((prev, marked))
     }

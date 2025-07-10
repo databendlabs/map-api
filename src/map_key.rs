@@ -23,16 +23,14 @@ use crate::map_value::MapValue;
 /// It is `Clone` to let MapApi clone a range of key.
 /// It is `Unpin` to let MapApi extract a key from pinned data, such as a stream.
 /// And it only accepts `static` value for simplicity.
-///
-/// `M` is the metadata type associated with the value `V`.
-pub trait MapKey<M>: Clone + Ord + fmt::Debug + Send + Sync + Unpin + 'static {
+pub trait MapKey: Clone + Ord + fmt::Debug + Send + Sync + Unpin + 'static {
     type V: MapValue;
 }
 
 mod impls {
     use super::MapKey;
 
-    impl<M> MapKey<M> for String {
+    impl MapKey for String {
         type V = Vec<u8>;
     }
 }

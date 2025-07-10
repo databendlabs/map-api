@@ -19,7 +19,7 @@ use std::io;
 use crate::MapKey;
 
 /// Result type of key-value pair and io Error used in a map.
-type KVResult<K, M> = Result<(K, crate::MarkedOf<K, M>), io::Error>;
+type KVResult<K> = Result<(K, crate::SeqMarkedOf<K>), io::Error>;
 
 /// Comparator function for sorting key-value results by key and internal sequence number.
 ///
@@ -28,8 +28,8 @@ type KVResult<K, M> = Result<(K, crate::MarkedOf<K, M>), io::Error>;
 /// 2. For the same key, entries are ordered by their internal sequence numbers
 ///
 /// Returns `true` if `r1` should be placed before `r2` in the sorted order.
-pub(crate) fn by_key_seq<K, M>(r1: &KVResult<K, M>, r2: &KVResult<K, M>) -> bool
-where K: MapKey<M> + Ord + fmt::Debug {
+pub(crate) fn by_key_seq<K>(r1: &KVResult<K>, r2: &KVResult<K>) -> bool
+where K: MapKey + Ord + fmt::Debug {
     match (r1, r2) {
         (Ok((k1, v1)), Ok((k2, v2))) => {
             let iseq1 = v1.order_key();
@@ -62,17 +62,15 @@ where K: MapKey<M> + Ord + fmt::Debug {
 /// If the keys are equal, returns `Ok(combined)` where the values are merged by taking the greater one.
 /// Otherwise, returns `Err((r1, r2))` to indicate that the results should not be merged.
 #[allow(clippy::type_complexity)]
-pub(crate) fn merge_kv_results<K, M>(
-    r1: KVResult<K, M>,
-    r2: KVResult<K, M>,
-) -> Result<KVResult<K, M>, (KVResult<K, M>, KVResult<K, M>)>
+pub(crate) fn merge_kv_results<K>(
+    r1: KVResult<K>,
+    r2: KVResult<K>,
+) -> Result<KVResult<K>, (KVResult<K>, KVResult<K>)>
 where
-    K: MapKey<M> + Ord,
+    K: MapKey + Ord,
 {
     match (r1, r2) {
-        (Ok((k1, v1)), Ok((k2, v2))) if k1 == k2 => {
-            Ok(Ok((k1, crate::marked::SeqMarked::max(v1, v2))))
-        }
+        (Ok((k1, v1)), Ok((k2, v2))) if k1 == k2 => Ok(Ok((k1, crate::SeqMarked::max(v1, v2)))),
         // If there is an error,
         // or k1 != k2
         // just yield them without change.

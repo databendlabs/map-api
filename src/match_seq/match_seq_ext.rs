@@ -26,7 +26,7 @@ mod tests {
     use crate::match_seq::MatchSeq;
     use crate::match_seq::MatchSeqExt;
 
-    type SeqV = crate::seq_value::SeqV<u64, u64>;
+    type SeqV = crate::SeqV<u64, u64>;
 
     #[test]
     fn test_match_seq_match_seq_value() -> anyhow::Result<()> {

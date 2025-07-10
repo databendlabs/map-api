@@ -19,12 +19,8 @@
 //! lifecycle of values in storage systems.
 
 mod change;
-mod seq_value_trait;
-mod seqv;
 
 pub use change::Change;
-pub use seq_value_trait::SeqValue;
-pub use seqv::SeqV;
 
 #[deprecated(since = "0.2.0", note = "Use `Change` instead")]
 pub type Update<M, V = Vec<u8>> = Change<M, V>;

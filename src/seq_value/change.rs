@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::seq_value::SeqV;
+use crate::SeqV;
 
 /// An update event for a key.
 #[derive(Debug, Clone, PartialEq, Eq)]

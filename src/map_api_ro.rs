@@ -23,7 +23,7 @@ use std::ops::RangeBounds;
 
 use crate::map_key::MapKey;
 use crate::KVResultStream;
-use crate::MarkedOf;
+use crate::SeqMarkedOf;
 
 /// Provides a read-only key-value map API.
 ///
@@ -36,7 +36,7 @@ use crate::MarkedOf;
 ///
 /// # Type Parameters
 ///
-/// - `K`: The key type, which must implement [`MapKey<M>`]
+/// - `K`: The key type, which must implement [`MapKey`]
 /// - `M`: The metadata type associated with values
 ///
 /// # Examples
@@ -49,7 +49,7 @@ use crate::MarkedOf;
 ///
 /// #[tokio::main]
 /// async fn main() -> io::Result<()> {
-///     let map = Level::<()>::default();
+///     let map = Level::default();
 ///
 ///     // Get a value by key
 ///     let value = map.get(&"example_key".to_string()).await?;
@@ -61,8 +61,8 @@ use crate::MarkedOf;
 /// }
 /// ```
 #[async_trait::async_trait]
-pub trait MapApiRO<K, M>: Send + Sync
-where K: MapKey<M>
+pub trait MapApiRO<K>: Send + Sync
+where K: MapKey
 {
     // The following does not work, because MapKeyEncode is defined in the application crate,
     // But using `Q` in the defining crate requires `MapKeyEncode`.
@@ -88,7 +88,7 @@ where K: MapKey<M>
     /// - `Ok(Marked::TombStone { ... })`: If the key has been deleted (tombstone)
     /// - `Ok(Marked::empty())`: If the key doesn't exist
     /// - `Err(io::Error)`: If an I/O error occurred during the operation
-    async fn get(&self, key: &K) -> Result<MarkedOf<K, M>, io::Error>;
+    async fn get(&self, key: &K) -> Result<SeqMarkedOf<K>, io::Error>;
 
     /// Iterate over a range of entries by keys.
     ///
@@ -106,24 +106,24 @@ where K: MapKey<M>
     ///
     /// # Notes
     ///
-    /// The returned stream includes tombstone entries ([`Marked::TombStone`](crate::marked::SeqMarked::TombStone)),
+    /// The returned stream includes tombstone entries (`SeqMarked::is_tombstone()`),
     /// which represent keys that have been deleted. This is useful for replication and
     /// synchronization purposes.
-    async fn range<R>(&self, range: R) -> Result<KVResultStream<K, M>, io::Error>
+    async fn range<R>(&self, range: R) -> Result<KVResultStream<K>, io::Error>
     where R: RangeBounds<K> + Send + Sync + Clone + 'static;
 }
 
 #[async_trait::async_trait]
-impl<K, M, T> MapApiRO<K, M> for &T
+impl<K, T> MapApiRO<K> for &T
 where
-    T: MapApiRO<K, M>,
-    K: MapKey<M>,
+    T: MapApiRO<K>,
+    K: MapKey,
 {
-    async fn get(&self, key: &K) -> Result<MarkedOf<K, M>, io::Error> {
+    async fn get(&self, key: &K) -> Result<SeqMarkedOf<K>, io::Error> {
         (**self).get(key).await
     }
 
-    async fn range<R>(&self, range: R) -> Result<KVResultStream<K, M>, io::Error>
+    async fn range<R>(&self, range: R) -> Result<KVResultStream<K>, io::Error>
     where R: RangeBounds<K> + Send + Sync + Clone + 'static {
         (**self).range(range).await
     }
@@ -137,22 +137,20 @@ mod impls {
 
     use crate::map_api_ro::MapApiRO;
     use crate::map_key::MapKey;
-    use crate::marked::SeqMarked;
     use crate::KVResultStream;
+    use crate::SeqMarked;
 
     /// Dummy implementation of [`MapApiRO`] for `()`.
     /// So that () can be used as a placeholder where a [`MapApiRO`] is expected.
     #[async_trait::async_trait]
-    impl<K, M> MapApiRO<K, M> for ()
-    where
-        K: MapKey<M>,
-        M: Send + 'static,
+    impl<K> MapApiRO<K> for ()
+    where K: MapKey
     {
-        async fn get(&self, _key: &K) -> Result<SeqMarked<M, K::V>, io::Error> {
-            Ok(SeqMarked::empty())
+        async fn get(&self, _key: &K) -> Result<SeqMarked<K::V>, io::Error> {
+            Ok(SeqMarked::new_not_found())
         }
 
-        async fn range<R>(&self, _range: R) -> Result<KVResultStream<K, M>, io::Error>
+        async fn range<R>(&self, _range: R) -> Result<KVResultStream<K>, io::Error>
         where R: RangeBounds<K> + Send + Sync + Clone + 'static {
             Ok(futures::stream::iter([]).boxed())
         }

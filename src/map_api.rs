@@ -45,14 +45,11 @@ use crate::BeforeAfter;
 ///
 /// #[tokio::main]
 /// async fn main() -> io::Result<()> {
-///     let mut map = Level::<()>::default();
+///     let mut map = Level::default();
 ///
 ///     // Set a value
 ///     let transition = map
-///         .set(
-///             "example_key".to_string(),
-///             Some(("example_value".as_bytes().to_vec(), None)),
-///         )
+///         .set("example_key".to_string(), Some(b"example_value".to_vec()))
 ///         .await?;
 ///
 ///     // Delete a value (set to None creates a tombstone)
@@ -62,10 +59,8 @@ use crate::BeforeAfter;
 /// }
 /// ```
 #[async_trait::async_trait]
-pub trait MapApi<K, M>: MapApiRO<K, M>
-where
-    K: MapKey<M>,
-    M: Unpin,
+pub trait MapApi<K>: MapApiRO<K>
+where K: MapKey
 {
     /// Set an entry and returns the old value and the new value.
     ///
@@ -91,6 +86,6 @@ where
     async fn set(
         &mut self,
         key: K,
-        value: Option<(K::V, Option<M>)>,
-    ) -> Result<BeforeAfter<crate::MarkedOf<K, M>>, io::Error>;
+        value: Option<K::V>,
+    ) -> Result<BeforeAfter<crate::SeqMarkedOf<K>>, io::Error>;
 }

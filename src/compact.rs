@@ -33,19 +33,17 @@ use crate::SeqMarked;
 /// `persisted` is a series of persisted on disk levels.
 ///
 /// - `K`: key type used in a map.
-/// - `M`: the value metadata type.
 /// - `L`: type of the several top levels
 /// - `PL`: the bottom persistent level.
-pub async fn compacted_get<K, M, L, PL>(
+pub async fn compacted_get<K, L, PL>(
     key: &K,
     levels: impl IntoIterator<Item = L>,
     persisted: impl IntoIterator<Item = PL>,
-) -> Result<crate::MarkedOf<K, M>, io::Error>
+) -> Result<crate::SeqMarkedOf<K>, io::Error>
 where
-    K: MapKey<M>,
-    M: Unpin + Send + 'static,
-    L: MapApiRO<K, M>,
-    PL: MapApiRO<K, M>,
+    K: MapKey,
+    L: MapApiRO<K>,
+    PL: MapApiRO<K>,
 {
     for lvl in levels {
         let got = lvl.get(key).await?;
@@ -61,16 +59,15 @@ where
         }
     }
 
-    Ok(SeqMarked::empty())
+    Ok(SeqMarked::new_not_found())
 }
 
 /// Iterate over a range of entries by keys from multi levels.
 ///
 /// The returned iterator contains at most one entry for each key.
-/// There could be tombstone entries: [`SeqMarked::TombStone`].
+/// There could be tombstone entries: [`SeqMarked::is_tombstone`].
 ///
 /// - `K`: key type used in a map.
-/// - `M`: the value metadata type.
 /// - `TOP` is the type of the top level.
 /// - `L` is the type of immutable levels.
 /// - `PL` is the type of the persisted level.
@@ -78,19 +75,18 @@ where
 /// Because the top level is very likely to be a different type from the immutable levels, i.e., it is writable.
 ///
 /// `persisted` is a series of persisted on disk levels that have different types.
-pub async fn compacted_range<K, R, M, TOP, L, PL>(
+pub async fn compacted_range<K, R, TOP, L, PL>(
     range: R,
     top: Option<&TOP>,
     levels: impl IntoIterator<Item = L>,
     persisted: impl IntoIterator<Item = PL>,
-) -> Result<crate::KVResultStream<K, M>, io::Error>
+) -> Result<crate::KVResultStream<K>, io::Error>
 where
-    K: MapKey<M>,
-    M: Unpin + Send + 'static,
+    K: MapKey,
     R: RangeBounds<K> + Clone + Send + Sync + 'static,
-    TOP: MapApiRO<K, M> + 'static,
-    L: MapApiRO<K, M>,
-    PL: MapApiRO<K, M>,
+    TOP: MapApiRO<K> + 'static,
+    L: MapApiRO<K>,
+    PL: MapApiRO<K>,
 {
     let mut kmerge = KMerge::by(util::by_key_seq);
 
@@ -124,29 +120,29 @@ mod tests {
     use crate::compact::compacted_range;
     use crate::impls::immutable::Immutable;
     use crate::impls::level::Level;
-    use crate::marked::SeqMarked;
     use crate::MapApi;
+    use crate::SeqMarked;
 
     #[tokio::test]
     async fn test_compacted_get() -> anyhow::Result<()> {
         let mut l0 = Level::default();
-        l0.set(s("a"), Some((b("a"), None))).await?;
+        l0.set(s("a"), Some(b("a"))).await?;
 
         let mut l1 = l0.new_level();
         l1.set(s("a"), None).await?;
 
         let l2 = l1.new_level();
 
-        let got = compacted_get::<String, _, _, Level>(&s("a"), [&l0, &l1, &l2], []).await?;
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l0, &l1, &l2], []).await?;
         assert_eq!(got, SeqMarked::new_normal(1, b("a")));
 
-        let got = compacted_get::<String, _, _, Level>(&s("a"), [&l2, &l1, &l0], []).await?;
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l2, &l1, &l0], []).await?;
         assert_eq!(got, SeqMarked::new_tombstone(1));
 
-        let got = compacted_get::<String, _, _, Level>(&s("a"), [&l1, &l0], []).await?;
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l1, &l0], []).await?;
         assert_eq!(got, SeqMarked::new_tombstone(1));
 
-        let got = compacted_get::<String, _, _, Level>(&s("a"), [&l2, &l0], []).await?;
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l2, &l0], []).await?;
         assert_eq!(got, SeqMarked::new_normal(1, b("a")));
         Ok(())
     }
@@ -154,7 +150,7 @@ mod tests {
     #[tokio::test]
     async fn test_compacted_get_with_persisted_levels() -> anyhow::Result<()> {
         let mut l0 = Level::default();
-        l0.set(s("a"), Some((b("a"), None))).await?;
+        l0.set(s("a"), Some(b("a"))).await?;
 
         let mut l1 = l0.new_level();
         l1.set(s("a"), None).await?;
@@ -162,18 +158,18 @@ mod tests {
         let l2 = l1.new_level();
 
         let mut l3 = l2.new_level();
-        l3.set(s("a"), Some((b("A"), None))).await?;
+        l3.set(s("a"), Some(b("A"))).await?;
 
-        let got = compacted_get::<String, _, _, Level>(&s("a"), [&l0, &l1, &l2], []).await?;
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l0, &l1, &l2], []).await?;
         assert_eq!(got, SeqMarked::new_normal(1, b("a")));
 
-        let got = compacted_get::<String, _, _, Level>(&s("a"), [&l2, &l1, &l0], []).await?;
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l2, &l1, &l0], []).await?;
         assert_eq!(got, SeqMarked::new_tombstone(1));
 
-        let got = compacted_get::<String, _, _, &Level>(&s("a"), [&l2], [&l3]).await?;
+        let got = compacted_get::<String, _, &Level>(&s("a"), [&l2], [&l3]).await?;
         assert_eq!(got, SeqMarked::new_normal(2, b("A")));
 
-        let got = compacted_get::<String, _, _, &Level>(&s("a"), [&l2], [&l2, &l3]).await?;
+        let got = compacted_get::<String, _, &Level>(&s("a"), [&l2], [&l2, &l3]).await?;
         assert_eq!(got, SeqMarked::new_normal(2, b("A")));
         Ok(())
     }
@@ -186,8 +182,8 @@ mod tests {
         // l0 | a  b
         // ```
         let mut l0 = Level::default();
-        l0.set(s("a"), Some((b("a"), None))).await?;
-        l0.set(s("b"), Some((b("b"), None))).await?;
+        l0.set(s("a"), Some(b("a"))).await?;
+        l0.set(s("b"), Some(b("b"))).await?;
         let l0 = Immutable::new_from_level(l0);
 
         let mut l1 = l0.new_level();
@@ -196,12 +192,12 @@ mod tests {
         let l1 = Immutable::new_from_level(l1);
 
         let mut l2 = l1.new_level();
-        l2.set(s("b"), Some((b("b2"), None))).await?;
+        l2.set(s("b"), Some(b("b2"))).await?;
 
         // With top level
         {
             let got =
-                compacted_range::<_, _, _, _, _, Level>(s("").., Some(&l2), [&l1, &l0], []).await?;
+                compacted_range::<_, _, _, _, Level>(s("").., Some(&l2), [&l1, &l0], []).await?;
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
@@ -210,8 +206,8 @@ mod tests {
                 (s("c"), SeqMarked::new_tombstone(2)),
             ]);
 
-            let got = compacted_range::<_, _, _, _, _, Level>(s("b").., Some(&l2), [&l1, &l0], [])
-                .await?;
+            let got =
+                compacted_range::<_, _, _, _, Level>(s("b").., Some(&l2), [&l1, &l0], []).await?;
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
@@ -223,7 +219,7 @@ mod tests {
         // Without top level
         {
             let got =
-                compacted_range::<_, _, _, Level, _, Level>(s("").., None, [&l1, &l0], []).await?;
+                compacted_range::<_, _, Level, _, Level>(s("").., None, [&l1, &l0], []).await?;
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
@@ -233,7 +229,7 @@ mod tests {
             ]);
 
             let got =
-                compacted_range::<_, _, _, Level, _, Level>(s("b").., None, [&l1, &l0], []).await?;
+                compacted_range::<_, _, Level, _, Level>(s("b").., None, [&l1, &l0], []).await?;
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //

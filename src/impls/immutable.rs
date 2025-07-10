@@ -20,18 +20,19 @@ use std::sync::Arc;
 use crate::impls::level::Level;
 use crate::KVResultStream;
 use crate::MapApiRO;
-use crate::MarkedOf;
+use crate::SeqMarkedOf;
+use crate::ValueOf;
 
 /// A single **immutable** level data.
 ///
 /// Only used for testing.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct Immutable<M = ()> {
+pub struct Immutable<V = Vec<u8>> {
     /// An in-process unique to identify this immutable level.
     ///
     /// It is used to assert an immutable level is not replaced after compaction.
-    level: Arc<Level<M>>,
+    level: Arc<Level<V>>,
 }
 
 impl<M> Immutable<M> {
@@ -61,14 +62,12 @@ impl<M> Deref for Immutable<M> {
 }
 
 #[async_trait::async_trait]
-impl<M> MapApiRO<String, M> for Immutable<M>
-where M: Clone + Unpin + Send + Sync + 'static
-{
-    async fn get(&self, key: &String) -> Result<MarkedOf<String, M>, io::Error> {
+impl MapApiRO<String> for Immutable<ValueOf<String>> {
+    async fn get(&self, key: &String) -> Result<SeqMarkedOf<String>, io::Error> {
         self.level.get(key).await
     }
 
-    async fn range<R>(&self, range: R) -> Result<KVResultStream<String, M>, io::Error>
+    async fn range<R>(&self, range: R) -> Result<KVResultStream<String>, io::Error>
     where R: RangeBounds<String> + Clone + Send + Sync + 'static {
         let strm = self.level.range(range).await?;
         Ok(strm)

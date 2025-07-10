@@ -15,7 +15,7 @@
 use crate::match_seq::errors::ConflictSeq;
 use crate::match_seq::MatchSeq;
 use crate::match_seq::MatchSeqExt;
-use crate::seq_value::SeqV;
+use crate::SeqV;
 
 impl MatchSeqExt<u64> for MatchSeq {
     fn match_seq(&self, seq: &u64) -> Result<(), ConflictSeq> {
