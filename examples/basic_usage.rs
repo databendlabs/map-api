@@ -4,7 +4,7 @@ use futures_util::StreamExt;
 use map_api::impls::level::Level;
 use map_api::MapApi;
 use map_api::MapApiRO;
-use map_api::Marked;
+use map_api::SeqMarked;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -39,8 +39,8 @@ async fn main() -> io::Result<()> {
     while let Some(result) = range.next().await {
         let (key, value) = result?;
         match value {
-            Marked::Normal { value, .. } => println!("{}: {:?}", key, value),
-            Marked::TombStone { .. } => println!("{}: <deleted>", key),
+            SeqMarked::Normal { value, .. } => println!("{}: {:?}", key, value),
+            SeqMarked::TombStone { .. } => println!("{}: <deleted>", key),
         }
     }
 

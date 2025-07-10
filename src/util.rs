@@ -71,7 +71,7 @@ where
 {
     match (r1, r2) {
         (Ok((k1, v1)), Ok((k2, v2))) if k1 == k2 => {
-            Ok(Ok((k1, crate::marked::Marked::max(v1, v2))))
+            Ok(Ok((k1, crate::marked::SeqMarked::max(v1, v2))))
         }
         // If there is an error,
         // or k1 != k2

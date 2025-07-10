@@ -30,8 +30,8 @@ use crate::KVResultStream;
 use crate::MapApi;
 use crate::MapApiRO;
 use crate::MapKey;
-use crate::Marked;
 use crate::MarkedOf;
+use crate::SeqMarked;
 
 /// A simple in-memory implementation of the Map API using a BTreeMap.
 ///
@@ -77,7 +77,7 @@ use crate::MarkedOf;
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct Level<M = ()>(u64, BTreeMap<String, Marked<M>>);
+pub struct Level<M = ()>(u64, BTreeMap<String, SeqMarked<M>>);
 
 impl<M> Level<M> {
     // Only used in tests
@@ -96,7 +96,7 @@ where M: Clone + Send + Sync + 'static
     /// Retrieves the value associated with the given key from the in-memory store.
     /// If the key doesn't exist, returns an empty `Marked` value.
     async fn get(&self, key: &String) -> Result<MarkedOf<String, M>, io::Error> {
-        let got = self.1.get(key).cloned().unwrap_or(Marked::empty());
+        let got = self.1.get(key).cloned().unwrap_or(SeqMarked::empty());
         Ok(got)
     }
 
@@ -136,14 +136,14 @@ where M: Clone + Unpin + Send + Sync + 'static
         let marked = if let Some((v, meta)) = value {
             self.0 += 1;
             let seq = self.0;
-            Marked::new_with_meta(seq, v, meta)
+            SeqMarked::new_with_meta(seq, v, meta)
         } else {
             // Do not increase the sequence number, just use the max seq for all tombstone.
             let seq = self.0;
-            Marked::new_tombstone(seq)
+            SeqMarked::new_tombstone(seq)
         };
 
-        let prev = self.1.get(&key).cloned().unwrap_or(Marked::empty());
+        let prev = self.1.get(&key).cloned().unwrap_or(SeqMarked::empty());
         self.1.insert(key, marked.clone());
         Ok((prev, marked))
     }

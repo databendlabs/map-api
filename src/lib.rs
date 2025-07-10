@@ -23,7 +23,7 @@
 //!
 //! - [`MapApiRO`]: Read-only operations for key-value access
 //! - [`MapApi`]: Read-write operations extending [`MapApiRO`]
-//! - [`Marked`]: A wrapper for values that can represent both normal values and tombstones
+//! - [`SeqMarked`]: A wrapper for values that can represent both normal values and tombstones
 //!
 //! ## Usage Example
 //!
@@ -34,7 +34,7 @@
 //! use map_api::impls::level::Level;
 //! use map_api::MapApi;
 //! use map_api::MapApiRO;
-//! use map_api::Marked;
+//! use map_api::SeqMarked;
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {
@@ -83,7 +83,7 @@ pub use crate::map_api::MapApi;
 pub use crate::map_api_ro::MapApiRO;
 pub use crate::map_key::MapKey;
 pub use crate::map_value::MapValue;
-pub use crate::marked::Marked;
+pub use crate::marked::SeqMarked;
 
 #[deprecated(since = "0.2.0", note = "Use `BeforeAfter` instead")]
 pub type Transition<T> = BeforeAfter<T>;
@@ -103,7 +103,7 @@ pub type IOResultStream<T> = BoxStream<'static, Result<T, io::Error>>;
 
 /// A Marked value type of key type.
 /// `M` represents the meta information associated with the value.
-pub type MarkedOf<K, M> = Marked<M, <K as MapKey<M>>::V>;
+pub type MarkedOf<K, M> = SeqMarked<M, <K as MapKey<M>>::V>;
 
 /// A key-value pair used in a map.
 /// `M` represents the meta information associated with the value.

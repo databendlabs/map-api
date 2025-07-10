@@ -106,7 +106,7 @@ where K: MapKey<M>
     ///
     /// # Notes
     ///
-    /// The returned stream includes tombstone entries ([`Marked::TombStone`](crate::marked::Marked::TombStone)),
+    /// The returned stream includes tombstone entries ([`Marked::TombStone`](crate::marked::SeqMarked::TombStone)),
     /// which represent keys that have been deleted. This is useful for replication and
     /// synchronization purposes.
     async fn range<R>(&self, range: R) -> Result<KVResultStream<K, M>, io::Error>
@@ -137,7 +137,7 @@ mod impls {
 
     use crate::map_api_ro::MapApiRO;
     use crate::map_key::MapKey;
-    use crate::marked::Marked;
+    use crate::marked::SeqMarked;
     use crate::KVResultStream;
 
     /// Dummy implementation of [`MapApiRO`] for `()`.
@@ -148,8 +148,8 @@ mod impls {
         K: MapKey<M>,
         M: Send + 'static,
     {
-        async fn get(&self, _key: &K) -> Result<Marked<M, K::V>, io::Error> {
-            Ok(Marked::empty())
+        async fn get(&self, _key: &K) -> Result<SeqMarked<M, K::V>, io::Error> {
+            Ok(SeqMarked::empty())
         }
 
         async fn range<R>(&self, _range: R) -> Result<KVResultStream<K, M>, io::Error>

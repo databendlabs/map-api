@@ -16,17 +16,17 @@
 
 use std::io;
 
-use crate::marked::Marked;
+use crate::marked::SeqMarked;
 
-impl<M> TryFrom<Marked<M>> for Marked<M, String> {
+impl<M> TryFrom<SeqMarked<M>> for SeqMarked<M, String> {
     type Error = io::Error;
 
     /// Convert `Marked<Vec<u8>>` to `Marked<String>`
-    fn try_from(marked: Marked<M>) -> Result<Self, Self::Error> {
+    fn try_from(marked: SeqMarked<M>) -> Result<Self, Self::Error> {
         // convert Vec<u8> to String
         match marked {
-            Marked::TombStone { internal_seq } => Ok(Marked::TombStone { internal_seq }),
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq } => Ok(SeqMarked::TombStone { internal_seq }),
+            SeqMarked::Normal {
                 internal_seq,
                 value,
                 meta,
@@ -37,7 +37,7 @@ impl<M> TryFrom<Marked<M>> for Marked<M, String> {
                         format!("fail to convert Vec<u8> to String: {}", e),
                     )
                 })?;
-                Ok(Marked::Normal {
+                Ok(SeqMarked::Normal {
                     internal_seq,
                     value: s,
                     meta,
@@ -47,18 +47,18 @@ impl<M> TryFrom<Marked<M>> for Marked<M, String> {
     }
 }
 
-impl<M> From<Marked<M, String>> for Marked<M> {
+impl<M> From<SeqMarked<M, String>> for SeqMarked<M> {
     /// Convert `Marked<String>` to `Marked<Vec<u8>>`
-    fn from(value: Marked<M, String>) -> Self {
+    fn from(value: SeqMarked<M, String>) -> Self {
         match value {
-            Marked::TombStone { internal_seq } => Marked::TombStone { internal_seq },
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq } => SeqMarked::TombStone { internal_seq },
+            SeqMarked::Normal {
                 internal_seq,
                 value,
                 meta,
             } => {
                 let v = value.into_bytes();
-                Marked::Normal {
+                SeqMarked::Normal {
                     internal_seq,
                     value: v,
                     meta,

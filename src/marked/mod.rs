@@ -55,20 +55,20 @@ use crate::seq_value::SeqValue;
 /// # Examples
 ///
 /// ```
-/// use map_api::Marked;
+/// use map_api::SeqMarked;
 ///
 /// // Create a normal value
-/// let normal = Marked::<(), Vec<u8>>::new_normal(1, vec![1, 2, 3]);
+/// let normal = SeqMarked::<(), Vec<u8>>::new_normal(1, vec![1, 2, 3]);
 ///
 /// // Create a tombstone (deleted value)
-/// let tombstone = Marked::<(), Vec<u8>>::new_tombstone(2);
+/// let tombstone = SeqMarked::<(), Vec<u8>>::new_tombstone(2);
 ///
 /// // Check if a value is a tombstone
 /// assert!(!normal.is_tombstone());
 /// assert!(tombstone.is_tombstone());
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Marked<M, T = Vec<u8>> {
+pub enum SeqMarked<M, T = Vec<u8>> {
     /// Represents a deleted value (tombstone).
     ///
     /// A tombstone is used to mark a key as deleted while preserving its
@@ -92,11 +92,11 @@ pub enum Marked<M, T = Vec<u8>> {
     },
 }
 
-impl<M, T> From<(u64, T, Option<M>)> for Marked<M, T> {
+impl<M, T> From<(u64, T, Option<M>)> for SeqMarked<M, T> {
     fn from((seq, value, meta): (u64, T, Option<M>)) -> Self {
         assert_ne!(seq, 0);
 
-        Marked::Normal {
+        SeqMarked::Normal {
             internal_seq: seq,
             value,
             meta,
@@ -104,17 +104,17 @@ impl<M, T> From<(u64, T, Option<M>)> for Marked<M, T> {
     }
 }
 
-impl<M, T> From<SeqV<M, T>> for Marked<M, T> {
+impl<M, T> From<SeqV<M, T>> for SeqMarked<M, T> {
     fn from(value: SeqV<M, T>) -> Self {
-        Marked::new_with_meta(value.seq, value.data, value.meta)
+        SeqMarked::new_with_meta(value.seq, value.data, value.meta)
     }
 }
 
-impl<M, T> SeqValue<M, T> for Marked<M, T> {
+impl<M, T> SeqValue<M, T> for SeqMarked<M, T> {
     fn seq(&self) -> u64 {
         match self {
-            Marked::TombStone { internal_seq: _ } => 0,
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: _ } => 0,
+            SeqMarked::Normal {
                 internal_seq: seq, ..
             } => *seq,
         }
@@ -122,8 +122,8 @@ impl<M, T> SeqValue<M, T> for Marked<M, T> {
 
     fn value(&self) -> Option<&T> {
         match self {
-            Marked::TombStone { internal_seq: _ } => None,
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: _ } => None,
+            SeqMarked::Normal {
                 internal_seq: _,
                 value,
                 meta: _,
@@ -133,8 +133,8 @@ impl<M, T> SeqValue<M, T> for Marked<M, T> {
 
     fn into_value(self) -> Option<T> {
         match self {
-            Marked::TombStone { internal_seq: _ } => None,
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: _ } => None,
+            SeqMarked::Normal {
                 internal_seq: _,
                 value,
                 meta: _,
@@ -144,22 +144,22 @@ impl<M, T> SeqValue<M, T> for Marked<M, T> {
 
     fn meta(&self) -> Option<&M> {
         match self {
-            Marked::TombStone { .. } => None,
-            Marked::Normal { meta, .. } => meta.as_ref(),
+            SeqMarked::TombStone { .. } => None,
+            SeqMarked::Normal { meta, .. } => meta.as_ref(),
         }
     }
 }
 
-impl<M, T> Marked<M, T> {
+impl<M, T> SeqMarked<M, T> {
     pub const fn empty() -> Self {
-        Marked::TombStone { internal_seq: 0 }
+        SeqMarked::TombStone { internal_seq: 0 }
     }
 
     /// Return a key to determine which one of the values of the same key are the last inserted.
     pub fn order_key(&self) -> SeqTombstone {
         match self {
-            Marked::TombStone { internal_seq: seq } => SeqTombstone::tombstone(*seq),
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: seq } => SeqTombstone::tombstone(*seq),
+            SeqMarked::Normal {
                 internal_seq: seq, ..
             } => SeqTombstone::normal(*seq),
         }
@@ -167,8 +167,8 @@ impl<M, T> Marked<M, T> {
 
     pub fn unpack(self) -> Option<(T, Option<M>)> {
         match self {
-            Marked::TombStone { internal_seq: _ } => None,
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: _ } => None,
+            SeqMarked::Normal {
                 internal_seq: _,
                 value,
                 meta,
@@ -178,8 +178,8 @@ impl<M, T> Marked<M, T> {
 
     pub fn unpack_ref(&self) -> Option<(&T, Option<&M>)> {
         match self {
-            Marked::TombStone { internal_seq: _ } => None,
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: _ } => None,
+            SeqMarked::Normal {
                 internal_seq: _,
                 value,
                 meta,
@@ -208,12 +208,12 @@ impl<M, T> Marked<M, T> {
     }
 
     pub fn new_tombstone(internal_seq: u64) -> Self {
-        Marked::TombStone { internal_seq }
+        SeqMarked::TombStone { internal_seq }
     }
 
     #[allow(dead_code)]
     pub fn new_normal(seq: u64, value: T) -> Self {
-        Marked::Normal {
+        SeqMarked::Normal {
             internal_seq: seq,
             value,
             meta: None,
@@ -221,7 +221,7 @@ impl<M, T> Marked<M, T> {
     }
 
     pub fn new_with_meta(seq: u64, value: T, meta: Option<M>) -> Self {
-        Marked::Normal {
+        SeqMarked::Normal {
             internal_seq: seq,
             value,
             meta,
@@ -231,14 +231,14 @@ impl<M, T> Marked<M, T> {
     #[allow(dead_code)]
     pub fn with_meta(self, meta: Option<M>) -> Self {
         match self {
-            Marked::TombStone { .. } => {
+            SeqMarked::TombStone { .. } => {
                 unreachable!("Tombstone has no meta")
             }
-            Marked::Normal {
+            SeqMarked::Normal {
                 internal_seq,
                 value,
                 ..
-            } => Marked::Normal {
+            } => SeqMarked::Normal {
                 internal_seq,
                 value,
                 meta,
@@ -248,24 +248,24 @@ impl<M, T> Marked<M, T> {
 
     /// Return if the entry is neither a normal entry nor a tombstone.
     pub fn is_not_found(&self) -> bool {
-        matches!(self, Marked::TombStone { internal_seq: 0 })
+        matches!(self, SeqMarked::TombStone { internal_seq: 0 })
     }
 
     pub fn is_tombstone(&self) -> bool {
-        matches!(self, Marked::TombStone { .. })
+        matches!(self, SeqMarked::TombStone { .. })
     }
 
     #[allow(dead_code)]
     pub(crate) fn is_normal(&self) -> bool {
-        matches!(self, Marked::Normal { .. })
+        matches!(self, SeqMarked::Normal { .. })
     }
 }
 
-impl<M, T> From<Marked<M, T>> for Option<SeqV<M, T>> {
-    fn from(value: Marked<M, T>) -> Self {
+impl<M, T> From<SeqMarked<M, T>> for Option<SeqV<M, T>> {
+    fn from(value: SeqMarked<M, T>) -> Self {
         match value {
-            Marked::TombStone { internal_seq: _ } => None,
-            Marked::Normal {
+            SeqMarked::TombStone { internal_seq: _ } => None,
+            SeqMarked::Normal {
                 internal_seq: seq,
                 value,
                 meta,
@@ -277,13 +277,13 @@ impl<M, T> From<Marked<M, T>> for Option<SeqV<M, T>> {
 #[cfg(test)]
 mod tests {
 
-    use super::Marked;
+    use super::SeqMarked;
 
     #[test]
     fn test_marked_new() {
-        let m = Marked::new_normal(1, "a");
+        let m = SeqMarked::new_normal(1, "a");
         assert_eq!(
-            Marked::Normal {
+            SeqMarked::Normal {
                 internal_seq: 1,
                 value: "a",
                 meta: None
@@ -294,7 +294,7 @@ mod tests {
         let m = m.with_meta(Some(20u64));
 
         assert_eq!(
-            Marked::Normal {
+            SeqMarked::Normal {
                 internal_seq: 1,
                 value: "a",
                 meta: Some(20u64)
@@ -302,10 +302,10 @@ mod tests {
             m
         );
 
-        let m = Marked::new_with_meta(2, "b", Some(30u64));
+        let m = SeqMarked::new_with_meta(2, "b", Some(30u64));
 
         assert_eq!(
-            Marked::Normal {
+            SeqMarked::Normal {
                 internal_seq: 2,
                 value: "b",
                 meta: Some(30u64)
@@ -313,7 +313,7 @@ mod tests {
             m
         );
 
-        let m: Marked<u32> = Marked::new_tombstone(3);
-        assert_eq!(Marked::TombStone { internal_seq: 3 }, m);
+        let m: SeqMarked<u32> = SeqMarked::new_tombstone(3);
+        assert_eq!(SeqMarked::TombStone { internal_seq: 3 }, m);
     }
 }

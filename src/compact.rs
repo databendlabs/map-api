@@ -24,7 +24,7 @@ use stream_more::StreamMore;
 use crate::util;
 use crate::MapApiRO;
 use crate::MapKey;
-use crate::Marked;
+use crate::SeqMarked;
 
 /// Get a key from multi levels data.
 ///
@@ -61,13 +61,13 @@ where
         }
     }
 
-    Ok(Marked::empty())
+    Ok(SeqMarked::empty())
 }
 
 /// Iterate over a range of entries by keys from multi levels.
 ///
 /// The returned iterator contains at most one entry for each key.
-/// There could be tombstone entries: [`Marked::TombStone`].
+/// There could be tombstone entries: [`SeqMarked::TombStone`].
 ///
 /// - `K`: key type used in a map.
 /// - `M`: the value metadata type.
@@ -124,7 +124,7 @@ mod tests {
     use crate::compact::compacted_range;
     use crate::impls::immutable::Immutable;
     use crate::impls::level::Level;
-    use crate::marked::Marked;
+    use crate::marked::SeqMarked;
     use crate::MapApi;
 
     #[tokio::test]
@@ -138,16 +138,16 @@ mod tests {
         let l2 = l1.new_level();
 
         let got = compacted_get::<String, _, _, Level>(&s("a"), [&l0, &l1, &l2], []).await?;
-        assert_eq!(got, Marked::new_normal(1, b("a")));
+        assert_eq!(got, SeqMarked::new_normal(1, b("a")));
 
         let got = compacted_get::<String, _, _, Level>(&s("a"), [&l2, &l1, &l0], []).await?;
-        assert_eq!(got, Marked::new_tombstone(1));
+        assert_eq!(got, SeqMarked::new_tombstone(1));
 
         let got = compacted_get::<String, _, _, Level>(&s("a"), [&l1, &l0], []).await?;
-        assert_eq!(got, Marked::new_tombstone(1));
+        assert_eq!(got, SeqMarked::new_tombstone(1));
 
         let got = compacted_get::<String, _, _, Level>(&s("a"), [&l2, &l0], []).await?;
-        assert_eq!(got, Marked::new_normal(1, b("a")));
+        assert_eq!(got, SeqMarked::new_normal(1, b("a")));
         Ok(())
     }
 
@@ -165,16 +165,16 @@ mod tests {
         l3.set(s("a"), Some((b("A"), None))).await?;
 
         let got = compacted_get::<String, _, _, Level>(&s("a"), [&l0, &l1, &l2], []).await?;
-        assert_eq!(got, Marked::new_normal(1, b("a")));
+        assert_eq!(got, SeqMarked::new_normal(1, b("a")));
 
         let got = compacted_get::<String, _, _, Level>(&s("a"), [&l2, &l1, &l0], []).await?;
-        assert_eq!(got, Marked::new_tombstone(1));
+        assert_eq!(got, SeqMarked::new_tombstone(1));
 
         let got = compacted_get::<String, _, _, &Level>(&s("a"), [&l2], [&l3]).await?;
-        assert_eq!(got, Marked::new_normal(2, b("A")));
+        assert_eq!(got, SeqMarked::new_normal(2, b("A")));
 
         let got = compacted_get::<String, _, _, &Level>(&s("a"), [&l2], [&l2, &l3]).await?;
-        assert_eq!(got, Marked::new_normal(2, b("A")));
+        assert_eq!(got, SeqMarked::new_normal(2, b("A")));
         Ok(())
     }
 
@@ -205,9 +205,9 @@ mod tests {
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
-                (s("a"), Marked::new_tombstone(2)),
-                (s("b"), Marked::new_normal(3, b("b2"))),
-                (s("c"), Marked::new_tombstone(2)),
+                (s("a"), SeqMarked::new_tombstone(2)),
+                (s("b"), SeqMarked::new_normal(3, b("b2"))),
+                (s("c"), SeqMarked::new_tombstone(2)),
             ]);
 
             let got = compacted_range::<_, _, _, _, _, Level>(s("b").., Some(&l2), [&l1, &l0], [])
@@ -215,8 +215,8 @@ mod tests {
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
-                (s("b"), Marked::new_normal(3, b("b2"))),
-                (s("c"), Marked::new_tombstone(2)),
+                (s("b"), SeqMarked::new_normal(3, b("b2"))),
+                (s("c"), SeqMarked::new_tombstone(2)),
             ]);
         }
 
@@ -227,9 +227,9 @@ mod tests {
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
-                (s("a"), Marked::new_tombstone(2)),
-                (s("b"), Marked::new_normal(2, b("b"))),
-                (s("c"), Marked::new_tombstone(2)),
+                (s("a"), SeqMarked::new_tombstone(2)),
+                (s("b"), SeqMarked::new_normal(2, b("b"))),
+                (s("c"), SeqMarked::new_tombstone(2)),
             ]);
 
             let got =
@@ -237,8 +237,8 @@ mod tests {
             let got = got.try_collect::<Vec<_>>().await?;
             assert_eq!(got, vec![
                 //
-                (s("b"), Marked::new_normal(2, b("b"))),
-                (s("c"), Marked::new_tombstone(2)),
+                (s("b"), SeqMarked::new_normal(2, b("b"))),
+                (s("c"), SeqMarked::new_tombstone(2)),
             ]);
         }
 
