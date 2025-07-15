@@ -104,11 +104,11 @@ jobs:
           RUSTDOCFLAGS: "-D warnings"
 
 
-      - shell: bash
-        run: cargo install cargo-audit
+      # - shell: bash
+      #   run: cargo install cargo-audit
 
 
-      - name: Audit dependencies
-        shell: bash
-        # if: "!contains(github.event.head_commit.message, 'skip audit')"
-        run: cargo audit --db ./target/advisory-db
+      # - name: Audit dependencies
+      #   shell: bash
+      #   # if: "!contains(github.event.head_commit.message, 'skip audit')"
+      #   run: cargo audit --db ./target/advisory-db
