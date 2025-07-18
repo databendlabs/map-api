@@ -74,6 +74,7 @@ pub mod seq_value;
 pub mod util;
 
 pub use seq_marked::Expirable;
+pub use seq_marked::Marked;
 pub use seq_marked::SeqMarked;
 pub use seq_marked::SeqV;
 pub use seq_marked::SeqValue;
