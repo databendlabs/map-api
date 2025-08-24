@@ -156,3 +156,118 @@ mod impls {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use futures_util::TryStreamExt;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_unit_impl_get() {
+        let unit_impl = ();
+        let result = unit_impl.get(&"any_key".to_string()).await.unwrap();
+
+        assert!(result.is_not_found());
+    }
+
+    #[tokio::test]
+    async fn test_unit_impl_range() {
+        let unit_impl = ();
+        let range_result = unit_impl
+            .range("a".to_string().."z".to_string())
+            .await
+            .unwrap();
+        let items: Vec<_> = range_result.try_collect().await.unwrap();
+
+        assert!(items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_unit_impl_full_range() {
+        let unit_impl = ();
+        let range_result: crate::KVResultStream<String> = unit_impl.range(..).await.unwrap();
+        let items: Vec<_> = range_result.try_collect().await.unwrap();
+
+        assert!(items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_reference_impl_delegation() {
+        use crate::impls::level::Level;
+        use crate::MapApi;
+
+        let mut level = Level::default();
+        level
+            .set(
+                "test_key".to_string(),
+                Some("test_value".as_bytes().to_vec()),
+            )
+            .await
+            .unwrap();
+
+        // Test that &Level implements MapApiRO
+        let level_ref = &level;
+        let result = level_ref.get(&"test_key".to_string()).await.unwrap();
+
+        assert!(result.is_normal());
+        assert_eq!(
+            result,
+            crate::SeqMarked::new_normal(1, "test_value".as_bytes().to_vec())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reference_impl_range_delegation() {
+        use crate::impls::level::Level;
+        use crate::MapApi;
+
+        let mut level = Level::default();
+        level
+            .set("key1".to_string(), Some("value1".as_bytes().to_vec()))
+            .await
+            .unwrap();
+        level
+            .set("key2".to_string(), Some("value2".as_bytes().to_vec()))
+            .await
+            .unwrap();
+
+        // Test that &Level implements MapApiRO for range
+        let level_ref = &level;
+        let range_result = level_ref
+            .range("key1".to_string().."key3".to_string())
+            .await
+            .unwrap();
+        let items: Vec<_> = range_result.try_collect().await.unwrap();
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].0, "key1");
+        assert_eq!(items[1].0, "key2");
+    }
+
+    #[tokio::test]
+    async fn test_reference_impl_get_nonexistent() {
+        use crate::impls::level::Level;
+
+        let level = Level::default();
+        let level_ref = &level;
+        let result = level_ref.get(&"nonexistent".to_string()).await.unwrap();
+
+        assert!(result.is_not_found());
+    }
+
+    #[tokio::test]
+    async fn test_reference_impl_empty_range() {
+        use crate::impls::level::Level;
+
+        let level = Level::default();
+        let level_ref = &level;
+        let range_result = level_ref
+            .range("a".to_string().."z".to_string())
+            .await
+            .unwrap();
+        let items: Vec<_> = range_result.try_collect().await.unwrap();
+
+        assert!(items.is_empty());
+    }
+}

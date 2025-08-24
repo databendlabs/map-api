@@ -31,3 +31,72 @@ impl<M, V> Change<M, V> {
         self.after.is_none()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SeqV;
+
+    #[test]
+    fn test_change_new() {
+        let before = Some(SeqV::new(1, "old_value".as_bytes().to_vec()));
+        let after = Some(SeqV::new(2, "new_value".as_bytes().to_vec()));
+
+        let change =
+            Change::<(), Vec<u8>>::new("test_key".to_string(), before.clone(), after.clone());
+
+        assert_eq!(change.key, "test_key");
+        assert_eq!(change.before, before);
+        assert_eq!(change.after, after);
+    }
+
+    #[test]
+    fn test_change_is_delete_true() {
+        let before = Some(SeqV::new(1, "value".as_bytes().to_vec()));
+        let change = Change::<(), Vec<u8>>::new("key".to_string(), before, None);
+
+        assert!(change.is_delete());
+    }
+
+    #[test]
+    fn test_change_is_delete_false() {
+        let before = Some(SeqV::new(1, "old".as_bytes().to_vec()));
+        let after = Some(SeqV::new(2, "new".as_bytes().to_vec()));
+        let change = Change::<(), Vec<u8>>::new("key".to_string(), before, after);
+
+        assert!(!change.is_delete());
+    }
+
+    #[test]
+    fn test_change_insert() {
+        let after = Some(SeqV::new(1, "new_value".as_bytes().to_vec()));
+        let change = Change::<(), Vec<u8>>::new("new_key".to_string(), None, after.clone());
+
+        assert_eq!(change.key, "new_key");
+        assert_eq!(change.before, None);
+        assert_eq!(change.after, after);
+        assert!(!change.is_delete());
+    }
+
+    #[test]
+    fn test_change_update() {
+        let before = Some(SeqV::new(1, "old".as_bytes().to_vec()));
+        let after = Some(SeqV::new(2, "new".as_bytes().to_vec()));
+        let change = Change::<(), Vec<u8>>::new("key".to_string(), before.clone(), after.clone());
+
+        assert_eq!(change.key, "key");
+        assert_eq!(change.before, before);
+        assert_eq!(change.after, after);
+        assert!(!change.is_delete());
+    }
+
+    #[test]
+    fn test_change_clone_and_eq() {
+        let before = Some(SeqV::new(1, vec![1, 2, 3]));
+        let after = Some(SeqV::new(2, vec![4, 5, 6]));
+        let change1 = Change::<(), Vec<u8>>::new("key".to_string(), before, after);
+        let change2 = change1.clone();
+
+        assert_eq!(change1, change2);
+    }
+}

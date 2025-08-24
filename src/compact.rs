@@ -26,6 +26,15 @@ use crate::MapApiRO;
 use crate::MapKey;
 use crate::SeqMarked;
 
+/// Return the newer if it is a `not-found` record.
+pub fn compact_seq_marked_pair<T>(newer: SeqMarked<T>, older: SeqMarked<T>) -> SeqMarked<T> {
+    if newer.is_not_found() {
+        older
+    } else {
+        newer
+    }
+}
+
 /// Get a key from multi levels data.
 ///
 /// Returns the first non-tombstone entry.
@@ -116,12 +125,36 @@ mod tests {
 
     use futures_util::TryStreamExt;
 
+    use super::*;
     use crate::compact::compacted_get;
     use crate::compact::compacted_range;
     use crate::impls::immutable::Immutable;
     use crate::impls::level::Level;
     use crate::MapApi;
     use crate::SeqMarked;
+
+    #[test]
+    fn test_compact_seq_marked_pair() {
+        assert_eq!(
+            compact_seq_marked_pair(SeqMarked::new_normal(1, "a"), SeqMarked::new_normal(2, "b")),
+            SeqMarked::new_normal(1, "a")
+        );
+        assert_eq!(
+            compact_seq_marked_pair(SeqMarked::new_normal(1, "a"), SeqMarked::new_tombstone(2)),
+            SeqMarked::new_normal(1, "a")
+        );
+        assert_eq!(
+            compact_seq_marked_pair(SeqMarked::new_tombstone(1), SeqMarked::new_normal(2, "b")),
+            SeqMarked::new_tombstone(1)
+        );
+        assert_eq!(
+            compact_seq_marked_pair(
+                SeqMarked::<()>::new_tombstone(0),
+                SeqMarked::new_tombstone(2)
+            ),
+            SeqMarked::new_tombstone(2)
+        );
+    }
 
     #[tokio::test]
     async fn test_compacted_get() -> anyhow::Result<()> {
@@ -247,5 +280,174 @@ mod tests {
 
     fn b(x: impl ToString) -> Vec<u8> {
         x.to_string().as_bytes().to_vec()
+    }
+
+    #[test]
+    fn test_compact_seq_marked_pair_edge_cases() {
+        // Not found newer should return older
+        assert_eq!(
+            compact_seq_marked_pair(
+                SeqMarked::<String>::new_not_found(),
+                SeqMarked::new_normal(5, "older".to_string())
+            ),
+            SeqMarked::new_normal(5, "older".to_string())
+        );
+
+        // Not found newer with tombstone older
+        assert_eq!(
+            compact_seq_marked_pair(
+                SeqMarked::<String>::new_not_found(),
+                SeqMarked::new_tombstone(3)
+            ),
+            SeqMarked::new_tombstone(3)
+        );
+
+        // Not found both
+        assert_eq!(
+            compact_seq_marked_pair(
+                SeqMarked::<String>::new_not_found(),
+                SeqMarked::<String>::new_not_found()
+            ),
+            SeqMarked::<String>::new_not_found()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compacted_get_empty_levels() -> anyhow::Result<()> {
+        // No levels at all
+        let got = compacted_get::<String, Level, Level>(&s("missing"), [], []).await?;
+        assert!(got.is_not_found());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_get_key_not_found() -> anyhow::Result<()> {
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("a"))).await?;
+
+        let mut l1 = l0.new_level();
+        l1.set(s("b"), Some(b("b"))).await?;
+
+        // Key not in any level
+        let got = compacted_get::<String, _, Level>(&s("missing"), [&l0, &l1], []).await?;
+        assert!(got.is_not_found());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_get_only_tombstones() -> anyhow::Result<()> {
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("a"))).await?;
+
+        let mut l1 = l0.new_level();
+        l1.set(s("a"), None).await?; // Tombstone
+
+        let mut l2 = l1.new_level();
+        l2.set(s("a"), None).await?; // Another tombstone
+
+        // Should find first tombstone
+        let got = compacted_get::<String, _, Level>(&s("a"), [&l2, &l1], []).await?;
+        assert_eq!(got, SeqMarked::new_tombstone(1));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_range_empty_levels() -> anyhow::Result<()> {
+        // No levels at all
+        let got = compacted_range::<String, _, Level, &Level, Level>(s("").., None, [], []).await?;
+        let got = got.try_collect::<Vec<_>>().await?;
+        assert!(got.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_range_single_level() -> anyhow::Result<()> {
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("a"))).await?;
+        l0.set(s("b"), Some(b("b"))).await?;
+
+        let got = compacted_range::<_, _, Level, _, Level>(s("").., None, [&l0], []).await?;
+        let got = got.try_collect::<Vec<_>>().await?;
+        assert_eq!(got, vec![
+            (s("a"), SeqMarked::new_normal(1, b("a"))),
+            (s("b"), SeqMarked::new_normal(2, b("b"))),
+        ]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_range_with_persisted_only() -> anyhow::Result<()> {
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("a"))).await?;
+        l0.set(s("b"), Some(b("b"))).await?;
+
+        // Only persisted levels, no in-memory levels
+        let got =
+            compacted_range::<String, _, Level, &Level, &Level>(s("").., None, [], [&l0]).await?;
+        let got = got.try_collect::<Vec<_>>().await?;
+        assert_eq!(got, vec![
+            (s("a"), SeqMarked::new_normal(1, b("a"))),
+            (s("b"), SeqMarked::new_normal(2, b("b"))),
+        ]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_range_overlapping_keys() -> anyhow::Result<()> {
+        // Test that newer versions override older ones
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("old_a"))).await?;
+        l0.set(s("c"), Some(b("c"))).await?;
+
+        let mut l1 = l0.new_level();
+        l1.set(s("a"), Some(b("new_a"))).await?; // Override
+        l1.set(s("b"), Some(b("b"))).await?; // New key
+
+        let got = compacted_range::<_, _, Level, _, Level>(s("").., None, [&l1, &l0], []).await?;
+        let got = got.try_collect::<Vec<_>>().await?;
+        assert_eq!(got, vec![
+            (s("a"), SeqMarked::new_normal(3, b("new_a"))), /* Newer version (sequence continues from l0) */
+            (s("b"), SeqMarked::new_normal(4, b("b"))),
+            (s("c"), SeqMarked::new_normal(2, b("c"))),
+        ]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_range_bounded_range() -> anyhow::Result<()> {
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("a"))).await?;
+        l0.set(s("b"), Some(b("b"))).await?;
+        l0.set(s("c"), Some(b("c"))).await?;
+        l0.set(s("d"), Some(b("d"))).await?;
+
+        // Test bounded range
+        let got =
+            compacted_range::<_, _, Level, _, Level>(s("b")..=s("c"), None, [&l0], []).await?;
+        let got = got.try_collect::<Vec<_>>().await?;
+        assert_eq!(got, vec![
+            (s("b"), SeqMarked::new_normal(2, b("b"))),
+            (s("c"), SeqMarked::new_normal(3, b("c"))),
+        ]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_compacted_range_all_tombstones() -> anyhow::Result<()> {
+        let mut l0 = Level::default();
+        l0.set(s("a"), Some(b("a"))).await?;
+        l0.set(s("b"), Some(b("b"))).await?;
+
+        let mut l1 = l0.new_level();
+        l1.set(s("a"), None).await?; // Tombstone
+        l1.set(s("b"), None).await?; // Tombstone
+
+        let got = compacted_range::<_, _, Level, _, Level>(s("").., None, [&l1], []).await?;
+        let got = got.try_collect::<Vec<_>>().await?;
+        assert_eq!(got, vec![
+            (s("a"), SeqMarked::new_tombstone(2)), /* Both tombstones get same seq from the implementation */
+            (s("b"), SeqMarked::new_tombstone(2)),
+        ]);
+        Ok(())
     }
 }

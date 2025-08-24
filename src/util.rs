@@ -16,10 +16,10 @@
 use std::fmt;
 use std::io;
 
-use crate::MapKey;
+use seq_marked::SeqMarked;
 
 /// Result type of key-value pair and io Error used in a map.
-type KVResult<K> = Result<(K, crate::SeqMarkedOf<K>), io::Error>;
+type KVResult<K, V> = Result<(K, SeqMarked<V>), io::Error>;
 
 /// Comparator function for sorting key-value results by key and internal sequence number.
 ///
@@ -28,8 +28,8 @@ type KVResult<K> = Result<(K, crate::SeqMarkedOf<K>), io::Error>;
 /// 2. For the same key, entries are ordered by their internal sequence numbers
 ///
 /// Returns `true` if `r1` should be placed before `r2` in the sorted order.
-pub(crate) fn by_key_seq<K>(r1: &KVResult<K>, r2: &KVResult<K>) -> bool
-where K: MapKey + Ord + fmt::Debug {
+pub fn by_key_seq<K, V>(r1: &KVResult<K, V>, r2: &KVResult<K, V>) -> bool
+where K: Ord + fmt::Debug {
     match (r1, r2) {
         (Ok((k1, v1)), Ok((k2, v2))) => {
             let iseq1 = v1.order_key();
@@ -62,12 +62,12 @@ where K: MapKey + Ord + fmt::Debug {
 /// If the keys are equal, returns `Ok(combined)` where the values are merged by taking the greater one.
 /// Otherwise, returns `Err((r1, r2))` to indicate that the results should not be merged.
 #[allow(clippy::type_complexity)]
-pub(crate) fn merge_kv_results<K>(
-    r1: KVResult<K>,
-    r2: KVResult<K>,
-) -> Result<KVResult<K>, (KVResult<K>, KVResult<K>)>
+pub fn merge_kv_results<K, V>(
+    r1: KVResult<K, V>,
+    r2: KVResult<K, V>,
+) -> Result<KVResult<K, V>, (KVResult<K, V>, KVResult<K, V>)>
 where
-    K: MapKey + Ord,
+    K: Ord,
 {
     match (r1, r2) {
         (Ok((k1, v1)), Ok((k2, v2))) if k1 == k2 => Ok(Ok((k1, crate::SeqMarked::max(v1, v2)))),
@@ -75,5 +75,246 @@ where
         // or k1 != k2
         // just yield them without change.
         (r1, r2) => Err((r1, r2)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Error;
+    use std::io::ErrorKind;
+
+    use seq_marked::SeqMarked;
+
+    use super::*;
+
+    #[test]
+    fn test_by_key_seq_different_keys() {
+        let r1: KVResult<String, String> =
+            Ok(("a".to_string(), SeqMarked::new_normal(1, "v1".to_string())));
+        let r2: KVResult<String, String> =
+            Ok(("b".to_string(), SeqMarked::new_normal(2, "v2".to_string())));
+
+        assert!(by_key_seq(&r1, &r2)); // "a" < "b"
+        assert!(!by_key_seq(&r2, &r1)); // "b" > "a"
+    }
+
+    #[test]
+    fn test_by_key_seq_same_key_different_seq() {
+        let r1: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let r2: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(2, "v2".to_string()),
+        ));
+
+        assert!(by_key_seq(&r1, &r2)); // seq 1 < seq 2
+        assert!(!by_key_seq(&r2, &r1)); // seq 2 > seq 1
+    }
+
+    #[test]
+    fn test_by_key_seq_same_key_normal_vs_tombstone() {
+        let normal: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let tombstone: KVResult<String, String> =
+            Ok(("key".to_string(), SeqMarked::new_tombstone(1)));
+
+        assert!(by_key_seq(&normal, &tombstone)); // normal < tombstone at same seq
+        assert!(!by_key_seq(&tombstone, &normal)); // tombstone > normal at same seq
+    }
+
+    #[test]
+    fn test_by_key_seq_same_key_both_tombstones() {
+        let tomb1: KVResult<String, String> = Ok(("key".to_string(), SeqMarked::new_tombstone(1)));
+        let tomb2: KVResult<String, String> = Ok(("key".to_string(), SeqMarked::new_tombstone(1)));
+
+        // Both tombstones with same seq are allowed and should be equal
+        assert!(by_key_seq(&tomb1, &tomb2));
+        assert!(by_key_seq(&tomb2, &tomb1));
+    }
+
+    #[test]
+    #[should_panic(expected = "by_key_seq: same (key, internal_seq) and not all tombstone")]
+    fn test_by_key_seq_same_key_seq_panic() {
+        let r1: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let r2: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v2".to_string()),
+        ));
+
+        // This should panic because same (key, seq) with normal values is not allowed
+        by_key_seq(&r1, &r2);
+    }
+
+    #[test]
+    fn test_by_key_seq_with_errors() {
+        let ok_result: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let err_result: KVResult<String, String> = Err(Error::new(ErrorKind::Other, "test error"));
+
+        // Error results should always yield true (maintain order)
+        assert!(by_key_seq(&err_result, &ok_result));
+        assert!(by_key_seq(&ok_result, &err_result));
+        assert!(by_key_seq(&err_result, &err_result));
+    }
+
+    #[test]
+    fn test_by_key_seq_equal_keys_different_seqs_ordering() {
+        let r1: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let r2: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(2, "v2".to_string()),
+        ));
+
+        // Lower sequence should come first (<=)
+        assert!(by_key_seq(&r1, &r2));
+        assert!(!by_key_seq(&r2, &r1));
+    }
+
+    #[test]
+    fn test_merge_kv_results_same_key() {
+        let r1: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let r2: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(2, "v2".to_string()),
+        ));
+
+        let result = merge_kv_results(r1, r2).unwrap();
+
+        match result {
+            Ok((key, value)) => {
+                assert_eq!(key, "key");
+                assert_eq!(value, SeqMarked::new_normal(2, "v2".to_string())); // Higher seq wins
+            }
+            _ => panic!("Expected Ok result"),
+        }
+    }
+
+    #[test]
+    fn test_merge_kv_results_different_keys() {
+        let r1: KVResult<String, String> = Ok((
+            "key1".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let r2: KVResult<String, String> = Ok((
+            "key2".to_string(),
+            SeqMarked::new_normal(2, "v2".to_string()),
+        ));
+
+        let result = merge_kv_results(r1, r2);
+
+        assert!(result.is_err());
+        let (returned_r1, returned_r2) = result.unwrap_err();
+        assert_eq!(returned_r1.unwrap().0, "key1");
+        assert_eq!(returned_r2.unwrap().0, "key2");
+    }
+
+    #[test]
+    fn test_merge_kv_results_with_tombstone() {
+        let normal: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let tombstone: KVResult<String, String> =
+            Ok(("key".to_string(), SeqMarked::new_tombstone(2)));
+
+        let result = merge_kv_results(normal, tombstone).unwrap();
+
+        match result {
+            Ok((key, value)) => {
+                assert_eq!(key, "key");
+                assert!(value.is_tombstone());
+                assert_eq!(value, SeqMarked::new_tombstone(2));
+            }
+            _ => panic!("Expected Ok result"),
+        }
+    }
+
+    #[test]
+    fn test_merge_kv_results_with_errors() {
+        let ok_result: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let err_result: KVResult<String, String> = Err(Error::new(ErrorKind::Other, "test error"));
+
+        // Error results should not be merged - create fresh instances since Error doesn't clone
+        let ok_result2: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let err_result2: KVResult<String, String> = Err(Error::new(ErrorKind::Other, "test error"));
+        let _ok_result3: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let err_result3: KVResult<String, String> = Err(Error::new(ErrorKind::Other, "test error"));
+        let err_result4: KVResult<String, String> = Err(Error::new(ErrorKind::Other, "test error"));
+
+        let result1 = merge_kv_results(ok_result, err_result);
+        assert!(result1.is_err());
+
+        let result2 = merge_kv_results(err_result2, ok_result2);
+        assert!(result2.is_err());
+
+        let result3 = merge_kv_results(err_result3, err_result4);
+        assert!(result3.is_err());
+    }
+
+    #[test]
+    fn test_merge_kv_results_normal_vs_tombstone_same_seq() {
+        let normal: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(1, "v1".to_string()),
+        ));
+        let tombstone: KVResult<String, String> =
+            Ok(("key".to_string(), SeqMarked::new_tombstone(1)));
+
+        let result = merge_kv_results(normal, tombstone).unwrap();
+
+        match result {
+            Ok((key, value)) => {
+                assert_eq!(key, "key");
+                // Tombstone should win even at same seq due to order_key behavior
+                assert!(value.is_tombstone());
+            }
+            _ => panic!("Expected Ok result"),
+        }
+    }
+
+    #[test]
+    fn test_merge_kv_results_preserves_higher_seq() {
+        let lower_seq: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(5, "v5".to_string()),
+        ));
+        let higher_seq: KVResult<String, String> = Ok((
+            "key".to_string(),
+            SeqMarked::new_normal(10, "v10".to_string()),
+        ));
+
+        let result = merge_kv_results(lower_seq, higher_seq).unwrap();
+
+        match result {
+            Ok((key, value)) => {
+                assert_eq!(key, "key");
+                assert_eq!(value, SeqMarked::new_normal(10, "v10".to_string()));
+            }
+            _ => panic!("Expected Ok result"),
+        }
     }
 }
