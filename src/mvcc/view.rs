@@ -288,6 +288,12 @@ where
         value: Option<V>,
     ) -> Result<(SeqMarked<V>, SeqMarked<V>), io::Error> {
         let old_value = self.get(space, key.clone()).await?;
+
+        if old_value.is_not_found() && value.is_none() {
+            // No such entry at all, no need to create a tombstone for delete
+            return Ok((old_value, SeqMarked::new_tombstone(0)));
+        }
+
         let order_key = self.set(space, key, value.clone());
         let new_value = match value {
             Some(v) => order_key.map(|_| v),
@@ -1386,5 +1392,44 @@ mod tests {
             current_value,
             SeqMarked::new_normal(11, value("resurrected"))
         );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_and_set_delete_nonexistent() {
+        let mut view = create_view(create_base_view());
+
+        // Try to delete a key that doesn't exist
+        let (old_value, new_value) = view
+            .fetch_and_set(TestSpace::Space1, key("nonexistent_key"), None)
+            .await
+            .unwrap();
+
+        // Should return not_found for old value
+        assert_eq!(old_value, SeqMarked::new_not_found());
+        // Should return tombstone with seq 0 (no tombstone created)
+        assert_eq!(new_value, SeqMarked::new_tombstone(0));
+
+        // Verify no tombstone was actually created in the changes
+        let key_exists_in_table = view
+            .changes
+            .get(&TestSpace::Space1)
+            .map(|table| {
+                table
+                    .inner
+                    .keys()
+                    .any(|(k, _)| k == &key("nonexistent_key"))
+            })
+            .unwrap_or(false);
+        assert!(!key_exists_in_table);
+
+        // Verify the key still doesn't exist
+        let current_value = view
+            .get(TestSpace::Space1, key("nonexistent_key"))
+            .await
+            .unwrap();
+        assert_eq!(current_value, SeqMarked::new_not_found());
+
+        // Verify last_seq was not incremented
+        assert_eq!(view.last_seq, InternalSeq::new(10));
     }
 }

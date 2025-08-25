@@ -49,6 +49,12 @@ where
         value: Option<V>,
     ) -> Result<(SeqMarked<V>, SeqMarked<V>), io::Error> {
         let old_value = self.get(key.clone()).await?;
+
+        if old_value.is_not_found() && value.is_none() {
+            // No such entry at all, no need to create a tombstone for delete
+            return Ok((old_value, SeqMarked::new_tombstone(0)));
+        }
+
         let order_key = self.set(key.clone(), value.clone());
         let new_value = match value {
             Some(v) => order_key.map(|_| v),
@@ -355,5 +361,28 @@ mod tests {
         // Verify final state
         let current_value = view.get(key("initial_key")).await.unwrap();
         assert_eq!(current_value, SeqMarked::new_normal(2, value("version2")));
+    }
+
+    #[tokio::test]
+    async fn test_scoped_view_trait_fetch_and_set_delete_nonexistent() {
+        let mut view = MockScopedView::new();
+
+        // Try to delete a key that doesn't exist
+        let (old_value, new_value) = view
+            .fetch_and_set(key("nonexistent_key"), None)
+            .await
+            .unwrap();
+
+        // Should return not_found for old value
+        assert_eq!(old_value, SeqMarked::new_not_found());
+        // Should return tombstone with seq 0 (no tombstone created)
+        assert_eq!(new_value, SeqMarked::new_tombstone(0));
+
+        // Verify the key still doesn't exist
+        let current_value = view.get(key("nonexistent_key")).await.unwrap();
+        assert_eq!(current_value, SeqMarked::new_not_found());
+
+        // Verify no entry was created in the mock data
+        assert!(!view.data.contains_key(&key("nonexistent_key")));
     }
 }
