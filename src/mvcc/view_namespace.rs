@@ -14,7 +14,7 @@
 
 use std::fmt;
 
-pub trait ViewNameSpace
+pub trait ViewNamespace
 where Self: Clone + Copy + Ord + fmt::Debug + Send + Sync + Unpin + 'static
 {
     /// Return whether inserting this namespace record requires an increase the sequence number by one.

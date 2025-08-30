@@ -20,9 +20,9 @@ mod tests {
     use seq_marked::InternalSeq;
     use seq_marked::SeqMarked;
 
-    use crate::mvcc::key_space::ViewNameSpace;
     use crate::mvcc::table::TableViewReadonly;
     use crate::mvcc::view::View;
+    use crate::mvcc::view_namespace::ViewNamespace;
     use crate::mvcc::Table;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,7 +30,7 @@ mod tests {
         Space1,
     }
 
-    impl ViewNameSpace for TestSpaceNoSeqIncrease {
+    impl ViewNamespace for TestSpaceNoSeqIncrease {
         fn if_increase_seq(&self) -> bool {
             false // This namespace does NOT increase sequence on normal inserts
         }
@@ -289,7 +289,7 @@ mod tests {
             WithIncrement,
         }
 
-        impl ViewNameSpace for MixedSpace {
+        impl ViewNamespace for MixedSpace {
             fn if_increase_seq(&self) -> bool {
                 match self {
                     MixedSpace::NoIncrement => false,

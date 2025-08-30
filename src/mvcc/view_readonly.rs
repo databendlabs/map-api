@@ -19,7 +19,7 @@ use seq_marked::InternalSeq;
 use seq_marked::SeqMarked;
 
 use crate::mvcc::ViewKey;
-use crate::mvcc::ViewNameSpace;
+use crate::mvcc::ViewNamespace;
 use crate::mvcc::ViewValue;
 use crate::IOResultStream;
 
@@ -71,7 +71,7 @@ use crate::IOResultStream;
 pub trait ViewReadonly<S, K, V>
 where
     Self: Send + Sync,
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
 {

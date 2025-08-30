@@ -21,16 +21,16 @@ use seq_marked::InternalSeq;
 use seq_marked::SeqMarked;
 
 use crate::mvcc::key::ViewKey;
-use crate::mvcc::key_space::ViewNameSpace;
 use crate::mvcc::table::Table;
 use crate::mvcc::value::ViewValue;
+use crate::mvcc::view_namespace::ViewNamespace;
 use crate::mvcc::view_readonly::ViewReadonly;
 use crate::IOResultStream;
 
 /// Implement ViewReadonly for a [`Table`] containing multiple key spaces.
 pub struct TableViewReadonly<S, K, V>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
 {
@@ -45,7 +45,7 @@ where
 
 impl<S, K, V> TableViewReadonly<S, K, V>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
 {
@@ -60,7 +60,7 @@ where
 #[async_trait::async_trait]
 impl<S, K, V> ViewReadonly<S, K, V> for TableViewReadonly<S, K, V>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
 {
@@ -120,7 +120,7 @@ mod tests {
         Space3,
     }
 
-    impl ViewNameSpace for TestSpace {
+    impl ViewNamespace for TestSpace {
         fn if_increase_seq(&self) -> bool {
             true
         }

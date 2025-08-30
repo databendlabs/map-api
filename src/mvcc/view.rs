@@ -26,10 +26,10 @@ use stream_more::StreamMore;
 use crate::compact::compact_seq_marked_pair;
 use crate::mvcc::commit::Commit;
 use crate::mvcc::key::ViewKey;
-use crate::mvcc::key_space::ViewNameSpace;
 use crate::mvcc::namespace_view::NamespaceView;
 use crate::mvcc::table::Table;
 use crate::mvcc::value::ViewValue;
+use crate::mvcc::view_namespace::ViewNamespace;
 use crate::mvcc::view_readonly::ViewReadonly;
 use crate::util;
 use crate::IOResultStream;
@@ -130,7 +130,7 @@ use crate::IOResultStream;
 ///   `BaseView` is usually a `ViewRo` that is created from the snapshot of the underlying storage.
 pub struct View<S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -153,7 +153,7 @@ where
 
 impl<S, K, V, BaseView> View<S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -347,7 +347,7 @@ where
 #[async_trait::async_trait]
 impl<S, K, V, BaseView> ViewReadonly<S, K, V> for View<S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -389,7 +389,7 @@ mod tests {
         Space2,
     }
 
-    impl ViewNameSpace for TestSpace {
+    impl ViewNamespace for TestSpace {
         fn if_increase_seq(&self) -> bool {
             true
         }

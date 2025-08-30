@@ -12,32 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
-use std::io;
+use std::ops::RangeBounds;
 
-use seq_marked::InternalSeq;
+use seq_marked::SeqMarked;
 
-use crate::mvcc::key::ViewKey;
-use crate::mvcc::table::Table;
-use crate::mvcc::value::ViewValue;
-use crate::mvcc::view_namespace::ViewNamespace;
+use crate::mvcc::ViewKey;
+use crate::mvcc::ViewNamespace;
+use crate::mvcc::ViewValue;
 
-/// A trait for committing a view with staged changes.
-#[async_trait::async_trait]
-pub trait Commit<S, K, V>
+/// Multi-version range iterator with snapshot isolation.
+pub trait SnapshotRangeIter<S, K, V>
 where
     S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
 {
-    /// Commit the staged changes in this view.
+    /// Returns iterator of key-value pairs within range at snapshot sequence.
     ///
-    /// Flushes pending changes to the underlying storage.
-    ///
-    /// Note: Whether changes are persisted depends on the implementation.
-    async fn commit(
-        &mut self,
-        last_seq: InternalSeq,
-        changes: BTreeMap<S, Table<K, V>>,
-    ) -> Result<(), io::Error>;
+    /// Returns most recent version for each key with sequence ≤ `snapshot_seq`.
+    /// Keys returned in sorted order, including tombstones.
+    fn range_iter<R>(
+        &self,
+        space: S,
+        range: R,
+        snapshot_seq: u64,
+    ) -> impl Iterator<Item = (&K, SeqMarked<&V>)>
+    where
+        R: RangeBounds<K> + Clone + 'static;
 }

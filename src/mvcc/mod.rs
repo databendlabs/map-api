@@ -14,13 +14,19 @@
 
 pub mod commit;
 pub mod key;
-pub mod key_space;
 pub mod namespace_view;
+pub mod scoped_snapshot_get;
+pub mod scoped_snapshot_into_range;
+pub mod scoped_snapshot_range_iter;
 pub mod scoped_view;
 pub mod scoped_view_readonly;
+pub mod snapshot_get;
+pub mod snapshot_into_range;
+pub mod snapshot_range_iter;
 pub mod table;
 pub mod value;
 pub mod view;
+pub mod view_namespace;
 pub mod view_readonly;
 
 #[cfg(test)]
@@ -28,11 +34,11 @@ mod namespace_view_no_seq_increase_test;
 
 pub use self::commit::Commit;
 pub use self::key::ViewKey;
-pub use self::key_space::ViewNameSpace;
 pub use self::scoped_view::ScopedView;
 pub use self::scoped_view_readonly::ScopedViewReadonly;
 pub use self::table::Table;
 pub use self::table::TableViewReadonly;
 pub use self::value::ViewValue;
 pub use self::view::View;
+pub use self::view_namespace::ViewNamespace;
 pub use self::view_readonly::ViewReadonly;

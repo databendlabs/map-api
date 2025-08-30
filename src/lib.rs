@@ -59,6 +59,8 @@
 //! }
 //! ```
 
+#![feature(coroutines)]
+
 use std::io;
 
 use futures_util::stream::BoxStream;

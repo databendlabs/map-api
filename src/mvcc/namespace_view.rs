@@ -23,14 +23,14 @@ use crate::mvcc::ScopedView;
 use crate::mvcc::ScopedViewReadonly;
 use crate::mvcc::View;
 use crate::mvcc::ViewKey;
-use crate::mvcc::ViewNameSpace;
+use crate::mvcc::ViewNamespace;
 use crate::mvcc::ViewReadonly;
 use crate::mvcc::ViewValue;
 use crate::IOResultStream;
 
 pub struct NamespaceView<'a, S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -41,7 +41,7 @@ where
 
 impl<S, K, V, BaseView> NamespaceView<'_, S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -63,7 +63,7 @@ where
 #[async_trait::async_trait]
 impl<S, K, V, BaseView> ScopedViewReadonly<K, V> for NamespaceView<'_, S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -85,7 +85,7 @@ where
 #[async_trait::async_trait]
 impl<S, K, V, BaseView> ScopedView<K, V> for NamespaceView<'_, S, K, V, BaseView>
 where
-    S: ViewNameSpace,
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
@@ -112,7 +112,7 @@ mod tests {
         Space1,
     }
 
-    impl ViewNameSpace for TestSpace {
+    impl ViewNamespace for TestSpace {
         fn if_increase_seq(&self) -> bool {
             true
         }

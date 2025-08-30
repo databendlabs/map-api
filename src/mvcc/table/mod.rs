@@ -14,6 +14,8 @@
 
 pub mod errors;
 mod impl_commit;
+mod impl_scoped_snapshot_get;
+mod impl_scoped_snapshot_range_iter;
 pub mod range_iter;
 mod table_view_readonly;
 
@@ -32,7 +34,7 @@ pub use table_view_readonly::TableViewReadonly;
 use crate::SeqMarked;
 
 /// A in-memory table contains multiple version of key-values
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Table<K, V> {
     /// Keep the most recent version of the key-value pair at the top of the map.
     ///
@@ -133,7 +135,7 @@ impl<K: Ord + Clone, V> Table<K, V> {
     /// that occur after the specified sequence. Cannot be fixed until delete operations
     /// increment the sequence number and the state machine is updated accordingly.
     pub fn range<R>(&self, range: R, upto: u64) -> RangeIter<'_, K, V>
-    where R: RangeBounds<K> + Send + Sync + Clone + 'static {
+    where R: RangeBounds<K> + Clone + 'static {
         // Include all the SeqMarked that is less than or equal to `upto`.
         let upto = SeqMarked::new_tombstone(upto);
 
