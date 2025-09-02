@@ -17,6 +17,7 @@ pub mod key;
 pub mod namespace_view;
 pub mod scoped_snapshot_get;
 pub mod scoped_snapshot_into_range;
+pub mod scoped_snapshot_range;
 pub mod scoped_snapshot_range_iter;
 pub mod scoped_view;
 pub mod scoped_view_readonly;
@@ -34,6 +35,10 @@ mod namespace_view_no_seq_increase_test;
 
 pub use self::commit::Commit;
 pub use self::key::ViewKey;
+pub use self::scoped_snapshot_get::ScopedSnapshotGet;
+pub use self::scoped_snapshot_into_range::ScopedSnapshotIntoRange;
+pub use self::scoped_snapshot_range::ScopedSnapshotRange;
+pub use self::scoped_snapshot_range_iter::ScopedSnapshotRangeIter;
 pub use self::scoped_view::ScopedView;
 pub use self::scoped_view_readonly::ScopedViewReadonly;
 pub use self::table::Table;

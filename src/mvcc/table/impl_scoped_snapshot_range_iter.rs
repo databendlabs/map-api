@@ -38,24 +38,6 @@ where
     }
 }
 
-impl<K, V, T> ScopedSnapshotRangeIter<K, V> for T
-where
-    K: ViewKey,
-    V: ViewValue,
-    T: AsRef<Table<K, V>>,
-{
-    fn range_iter<R>(
-        &self,
-        range: R,
-        snapshot_seq: u64,
-    ) -> impl Iterator<Item = (&K, SeqMarked<&V>)>
-    where
-        R: RangeBounds<K> + Clone + 'static,
-    {
-        self.as_ref().range_iter(range, snapshot_seq)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
