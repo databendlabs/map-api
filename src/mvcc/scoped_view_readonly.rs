@@ -22,23 +22,23 @@ use crate::mvcc::ViewKey;
 use crate::mvcc::ViewValue;
 use crate::IOResultStream;
 
-/// A read-only view bound to a specific namespace. It is used to read data
-/// from a namespace without modifying it.
+/// Read-only access to a namespace-scoped view.
 ///
-/// This trait provides access to data within a namespace that is embedded
-/// in the view implementation, eliminating the need to specify namespace
-/// parameters for each operation.
+/// Operations are pre-scoped to a namespace, eliminating the need to specify
+/// namespace parameters on each call.
 #[async_trait::async_trait]
 pub trait ScopedViewReadonly<K, V>
 where
     K: ViewKey,
     V: ViewValue,
 {
-    /// Return the last seq(inclusive) this view can see.
+    /// Maximum sequence number visible in this view.
     fn base_seq(&self) -> InternalSeq;
 
+    /// Get a single value by key.
     async fn get(&self, key: K) -> Result<SeqMarked<V>, io::Error>;
 
+    /// Stream key-value pairs within the specified range.
     async fn range<R>(&self, range: R) -> Result<IOResultStream<(K, SeqMarked<V>)>, io::Error>
     where R: RangeBounds<K> + Send + Sync + Clone + 'static;
 }

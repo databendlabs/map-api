@@ -14,8 +14,13 @@
 
 use seq_marked::SeqMarked;
 
+/// Errors that can occur during table insert operations.
 #[derive(Clone, PartialEq, Eq, thiserror::Error, Debug)]
 pub enum InsertError {
+    /// Sequence number is not monotonically increasing.
+    ///
+    /// All normal inserts must have strictly increasing sequences.
+    /// Tombstones may reuse the current sequence.
     #[error("NonIncremental: current={current:?} >= last={last:?}(equal only allowed for tombstone) does not hold")]
     NonIncremental {
         last: SeqMarked<()>,

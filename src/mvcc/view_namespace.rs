@@ -14,12 +14,18 @@
 
 use std::fmt;
 
+/// Trait for namespace identifiers in MVCC operations.
+///
+/// Namespaces partition data and control sequence number allocation behavior.
 pub trait ViewNamespace
 where Self: Clone + Copy + Ord + fmt::Debug + Send + Sync + Unpin + 'static
 {
-    /// Return whether inserting this namespace record requires an increase the sequence number by one.
+    /// Whether insertions in this namespace increment the sequence number.
     ///
-    /// Associated record, such as a secondary index of the primary index may share the same seq.
-    /// For example, insert `(k1 seq=3) = "x"`, and its expiration index key is `((timestamp, seq=3), seq=3) = key`
+    /// Related data (like secondary indices) can share sequence numbers by returning `false`.
+    ///
+    /// # Example
+    /// Primary record: `(key, seq=5) = "value"`
+    /// Index record: `(index_key, seq=5) = key` (shares sequence)
     fn if_increase_seq(&self) -> bool;
 }

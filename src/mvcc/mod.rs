@@ -12,6 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Multi-Version Concurrency Control (MVCC) implementation.
+//!
+//! Provides snapshot isolation for concurrent access to versioned key-value data.
+//! Operations are organized by namespaces and support both read-only and read-write access patterns.
+//!
+//! # Core Components
+//!
+//! - **[`Table`]**: In-memory storage for versioned key-value pairs
+//! - **[`View`]**: Read-write transactional view with staged changes  
+//! - **Snapshot traits**: Read-only access at specific sequence points
+//! - **Scoped traits**: Namespace-bound operations for convenience
+//!
+//! # Usage
+//!
+//! ```rust,ignore
+//! // Create storage and view
+//! let table = Table::new();
+//! let mut view = View::new(table);
+//!
+//! // Perform operations
+//! view.set(namespace, key, Some(value));
+//! let result = view.get(namespace, key).await?;
+//!
+//! // Commit changes
+//! let updated_table = view.commit().await?;
+//! ```
+
 pub mod commit;
 pub mod key;
 pub mod namespace_view;

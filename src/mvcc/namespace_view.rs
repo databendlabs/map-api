@@ -28,6 +28,10 @@ use crate::mvcc::ViewReadonly;
 use crate::mvcc::ViewValue;
 use crate::IOResultStream;
 
+/// A view scoped to a specific namespace for convenient operations.
+///
+/// Provides namespace-scoped access to an underlying `View`, eliminating
+/// the need to specify the namespace parameter for each operation.
 pub struct NamespaceView<'a, S, K, V, BaseView>
 where
     S: ViewNamespace,

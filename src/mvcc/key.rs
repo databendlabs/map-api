@@ -14,6 +14,9 @@
 
 use std::fmt;
 
+/// Trait for types that can be used as keys in MVCC operations.
+///
+/// Keys must be orderable for range queries and serializable for storage.
 pub trait ViewKey
 where Self: Clone + Ord + fmt::Debug + Send + Sync + Unpin + 'static
 {

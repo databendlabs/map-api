@@ -14,7 +14,9 @@
 
 use std::fmt;
 
+/// Trait for types that can be stored as values in MVCC operations.
+///
+/// Values must be cloneable for versioning and serializable for storage.
 pub trait ViewValue: fmt::Debug + Clone + Send + Sync + Unpin + 'static {}
 
-// Auto implement MapValue for all types that satisfy the constraints.
 impl<V> ViewValue for V where V: fmt::Debug + Clone + Send + Sync + Unpin + 'static {}
