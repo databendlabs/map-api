@@ -133,7 +133,7 @@ mod tests {
         let keys = vec![key("key1"), key("key2"), key("nonexistent")];
         let snapshot_seq = 10;
 
-        let results = ScopedSnapshotGet::mget(&table, keys, snapshot_seq)
+        let results = ScopedSnapshotGet::get_many(&table, keys, snapshot_seq)
             .await
             .unwrap();
 
@@ -151,7 +151,7 @@ mod tests {
         let keys = vec![];
         let snapshot_seq = 10;
 
-        let results = ScopedSnapshotGet::mget(&table, keys, snapshot_seq)
+        let results = ScopedSnapshotGet::get_many(&table, keys, snapshot_seq)
             .await
             .unwrap();
         assert_eq!(results.len(), 0);
@@ -163,7 +163,7 @@ mod tests {
         let keys = vec![key("key1"), key("key4")]; // key1 has multiple versions, key4 seq=10
         let snapshot_seq = 5;
 
-        let results = ScopedSnapshotGet::mget(&table, keys, snapshot_seq)
+        let results = ScopedSnapshotGet::get_many(&table, keys, snapshot_seq)
             .await
             .unwrap();
 

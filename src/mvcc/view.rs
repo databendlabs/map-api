@@ -265,7 +265,7 @@ where
     ///
     /// This implementation calls `get` for each key, combining staged changes
     /// with the base view data for each key individually.
-    pub async fn mget(&self, space: S, keys: Vec<K>) -> Result<Vec<SeqMarked<V>>, io::Error> {
+    pub async fn get_many(&self, space: S, keys: Vec<K>) -> Result<Vec<SeqMarked<V>>, io::Error> {
         let mut results = Vec::with_capacity(keys.len());
         for key in keys {
             let result = self.get(space, key).await?;
@@ -492,7 +492,7 @@ mod tests {
         let view = create_view(create_base_view());
 
         let keys = vec![key("base_k1"), key("base_k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("base_v1")));
@@ -517,7 +517,7 @@ mod tests {
         );
 
         let keys = vec![key("new_k1"), key("new_k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], SeqMarked::new_normal(11, value("new_v1")));
@@ -544,7 +544,7 @@ mod tests {
         );
 
         let keys = vec![key("base_k1"), key("base_k2"), key("new_k1")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], SeqMarked::new_normal(11, value("updated_v1"))); // from changes
@@ -564,7 +564,7 @@ mod tests {
         assert_eq!(result, SeqMarked::new_tombstone(10)); // tombstone uses initial last_seq (10)
 
         let keys = vec![key("base_k1")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_tombstone(10)); // tombstone wins
@@ -575,7 +575,7 @@ mod tests {
         let view = create_view(create_base_view());
 
         let keys = vec![key("k1")];
-        let result = view.mget(TestSpace::Space2, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space2, keys).await.unwrap();
 
         assert_eq!(result.len(), 1);
         assert!(result[0].is_not_found());
@@ -712,18 +712,18 @@ mod tests {
 
         // Verify the base view contains the committed changes
         let keys = vec![key("k1")];
-        let result = base_view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = base_view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_normal(11, value("v1")));
 
         let keys = vec![key("k2")];
-        let result = base_view.mget(TestSpace::Space2, keys).await.unwrap();
+        let result = base_view.get_many(TestSpace::Space2, keys).await.unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_normal(12, value("v2")));
 
         // Should also still contain original base data
         let keys = vec![key("base_k1"), key("base_k2")];
-        let result = base_view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = base_view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("base_v1")));
         assert_eq!(result[1], SeqMarked::new_normal(2, value("base_v2")));
@@ -812,7 +812,7 @@ mod tests {
 
         // Test mget
         let keys = vec![key("base_k1"), key("base_k2"), key("new_k1")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 3);
         assert_eq!(
@@ -845,7 +845,7 @@ mod tests {
 
         // mget should work with empty base
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
         assert_eq!(result[1], SeqMarked::new_tombstone(1));
     }
@@ -910,7 +910,7 @@ mod tests {
 
         // Via mget, should see resurrected value
         let keys = vec![key("base_k1")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(11, value("resurrected")));
     }
 
@@ -955,11 +955,11 @@ mod tests {
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
 
         // Empty key list should return empty result
-        let result = view.mget(TestSpace::Space1, vec![]).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, vec![]).await.unwrap();
         assert_eq!(result.len(), 0);
 
         // Empty key list on non-existent space
-        let result = view.mget(TestSpace::Space2, vec![]).await.unwrap();
+        let result = view.get_many(TestSpace::Space2, vec![]).await.unwrap();
         assert_eq!(result.len(), 0);
     }
 
@@ -1095,7 +1095,7 @@ mod tests {
         let view = create_view(base);
 
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], SeqMarked::new_normal(10, value("v1"))); // visible
@@ -1123,7 +1123,7 @@ mod tests {
 
         // Via mget
         let keys = vec![large_key];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(11, large_value));
     }
 
@@ -1144,7 +1144,7 @@ mod tests {
 
         // mget many keys
         let keys: Vec<_> = (0..100).map(|i| key(&format!("k{:03}", i))).collect();
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 100);
         for (i, seq_marked) in result.iter().enumerate() {
@@ -1165,7 +1165,7 @@ mod tests {
 
         // mget with last_seq exactly matching
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], SeqMarked::new_normal(11, value("v1")));

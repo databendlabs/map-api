@@ -210,7 +210,7 @@ mod tests {
         // Test mget on secondary index
         let keys = vec![key("secondary_index_k1")];
         let result = view
-            .mget(TestSpaceNoSeqIncrease::Space1, keys)
+            .get_many(TestSpaceNoSeqIncrease::Space1, keys)
             .await
             .unwrap();
 
@@ -358,7 +358,7 @@ mod tests {
         // Test mget
         let keys = vec![key("k1")];
         let result = view
-            .mget(TestSpaceNoSeqIncrease::Space1, keys)
+            .get_many(TestSpaceNoSeqIncrease::Space1, keys)
             .await
             .unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));

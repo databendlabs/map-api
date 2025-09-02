@@ -196,7 +196,7 @@ mod tests {
             key("k5"),
             key("k6"),
         ];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 6);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
@@ -214,7 +214,7 @@ mod tests {
         view.base_seq = InternalSeq::new(10);
 
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert!(result[0].is_not_found());
@@ -229,7 +229,7 @@ mod tests {
         let mut view = TableViewReadonly::new(tables);
         view.base_seq = InternalSeq::new(10);
 
-        let result = view.mget(TestSpace::Space1, vec![]).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, vec![]).await.unwrap();
         assert_eq!(result.len(), 0);
     }
 
@@ -249,7 +249,7 @@ mod tests {
             key("k5"),
             key("k6"),
         ];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 6);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
@@ -276,7 +276,7 @@ mod tests {
             key("k5"),
             key("k6"),
         ];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 6);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
@@ -303,7 +303,7 @@ mod tests {
             key("k5"),
             key("k6"),
         ];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 6);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
@@ -330,7 +330,7 @@ mod tests {
             key("k5"),
             key("k6"),
         ];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 6);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
@@ -351,19 +351,25 @@ mod tests {
         // Test viewing at seq 5 (before tombstone)
         view.base_seq = InternalSeq::new(5);
         let keys = vec![key("k5")];
-        let result = view.mget(TestSpace::Space1, keys.clone()).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, keys.clone())
+            .await
+            .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_normal(5, value("v5")));
 
         // Test viewing at seq 6 (after tombstone)
         view.base_seq = InternalSeq::new(6);
-        let result = view.mget(TestSpace::Space1, keys.clone()).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, keys.clone())
+            .await
+            .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_tombstone(6));
 
         // Test viewing at seq 7 (after tombstone)
         view.base_seq = InternalSeq::new(7);
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_tombstone(6)); // Still see tombstone
     }
@@ -378,18 +384,24 @@ mod tests {
         // Test viewing at seq 7 (before tombstone)
         view.base_seq = InternalSeq::new(7);
         let keys = vec![key("k6")];
-        let result = view.mget(TestSpace::Space1, keys.clone()).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, keys.clone())
+            .await
+            .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_normal(7, value("v6")));
 
         view.base_seq = InternalSeq::new(8);
-        let result = view.mget(TestSpace::Space1, keys.clone()).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, keys.clone())
+            .await
+            .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_tombstone(8)); // Latest version is tombstone
 
         // Test viewing at seq 9 (after tombstone)
         view.base_seq = InternalSeq::new(9);
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_tombstone(8)); // Still see tombstone
     }
@@ -601,21 +613,21 @@ mod tests {
 
         // Test Space1
         let keys1 = vec![key("k1"), key("k2")];
-        let result1 = view.mget(TestSpace::Space1, keys1).await.unwrap();
+        let result1 = view.get_many(TestSpace::Space1, keys1).await.unwrap();
         assert_eq!(result1.len(), 2);
         assert_eq!(result1[0], SeqMarked::new_normal(1, value("v1")));
         assert_eq!(result1[1], SeqMarked::new_normal(2, value("v2")));
 
         // Test Space2
         let keys2 = vec![key("a1"), key("a2")];
-        let result2 = view.mget(TestSpace::Space2, keys2).await.unwrap();
+        let result2 = view.get_many(TestSpace::Space2, keys2).await.unwrap();
         assert_eq!(result2.len(), 2);
         assert_eq!(result2[0], SeqMarked::new_normal(1, value("av1")));
         assert_eq!(result2[1], SeqMarked::new_normal(2, value("av2")));
 
         // Test nonexistent Space3
         let keys3 = vec![key("x1")];
-        let result3 = view.mget(TestSpace::Space3, keys3).await.unwrap();
+        let result3 = view.get_many(TestSpace::Space3, keys3).await.unwrap();
         assert_eq!(result3.len(), 1);
         assert!(result3[0].is_not_found());
     }
@@ -636,7 +648,7 @@ mod tests {
         view.base_seq = InternalSeq::new(75); // Between 50 and 100
 
         let keys = vec![key("k1"), key("k2"), key("k3")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
@@ -653,7 +665,7 @@ mod tests {
         view.base_seq = InternalSeq::new(0); // Can't see anything
 
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert!(result[0].is_not_found());
@@ -669,7 +681,7 @@ mod tests {
         view.base_seq = InternalSeq::new(0); // Can't see anything
 
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert!(result[0].is_not_found());
@@ -695,23 +707,38 @@ mod tests {
 
         // Test at different view sequences
         view.base_seq = InternalSeq::new(1);
-        let result = view.mget(TestSpace::Space1, vec![key("k1")]).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, vec![key("k1")])
+            .await
+            .unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
 
         view.base_seq = InternalSeq::new(3);
-        let result = view.mget(TestSpace::Space1, vec![key("k1")]).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, vec![key("k1")])
+            .await
+            .unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(3, value("v1_updated")));
 
         view.base_seq = InternalSeq::new(5);
-        let result = view.mget(TestSpace::Space1, vec![key("k1")]).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, vec![key("k1")])
+            .await
+            .unwrap();
         assert_eq!(result[0], SeqMarked::new_tombstone(5));
 
         view.base_seq = InternalSeq::new(7);
-        let result = view.mget(TestSpace::Space1, vec![key("k1")]).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, vec![key("k1")])
+            .await
+            .unwrap();
         assert_eq!(result[0], SeqMarked::new_normal(7, value("v1_resurrected")));
 
         view.base_seq = InternalSeq::new(9);
-        let result = view.mget(TestSpace::Space1, vec![key("k1")]).await.unwrap();
+        let result = view
+            .get_many(TestSpace::Space1, vec![key("k1")])
+            .await
+            .unwrap();
         assert_eq!(result[0], SeqMarked::new_tombstone(9));
     }
 
@@ -865,7 +892,7 @@ mod tests {
 
         // Test mget on empty table
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
         assert_eq!(result.len(), 2);
         assert!(result[0].is_not_found());
         assert!(result[1].is_not_found());
@@ -893,7 +920,7 @@ mod tests {
         //
         view.base_seq = InternalSeq::new(u64::MAX);
         let keys = vec![key("k1"), key("k2")];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(
@@ -953,7 +980,7 @@ mod tests {
             key("ky"), // doesn't exist
             key("k5"), // exists (tombstone)
         ];
-        let result = view.mget(TestSpace::Space1, keys).await.unwrap();
+        let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
 
         assert_eq!(result.len(), 5);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));

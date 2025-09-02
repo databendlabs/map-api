@@ -44,7 +44,7 @@ where
     /// Gets multiple keys at the given snapshot sequence.
     ///
     /// Results maintain the same order as input keys. Default implementation calls `get()` sequentially.
-    async fn mget(
+    async fn get_many(
         &self,
         space: S,
         keys: Vec<K>,
@@ -229,7 +229,10 @@ mod tests {
         // Test basic mget with mixed results (existing, not found)
         let keys = vec![key("key1"), key("key2"), key("nonexistent")];
         let snapshot_seq = 10;
-        let results = reader.mget(namespace(1), keys, snapshot_seq).await.unwrap();
+        let results = reader
+            .get_many(namespace(1), keys, snapshot_seq)
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 3);
         assert_eq!(results[0], SeqMarked::new_normal(1, value("value1")));
@@ -241,7 +244,7 @@ mod tests {
         // Test empty key vector
         let empty_keys = vec![];
         let results = reader
-            .mget(namespace(1), empty_keys, snapshot_seq)
+            .get_many(namespace(1), empty_keys, snapshot_seq)
             .await
             .unwrap();
         assert_eq!(results.len(), 0);
@@ -249,7 +252,10 @@ mod tests {
         // Test sequence filtering in mget
         let keys = vec![key("key1"), key("key4")]; // key1 seq=1, key4 seq=10
         let snapshot_seq = 5;
-        let results = reader.mget(namespace(1), keys, snapshot_seq).await.unwrap();
+        let results = reader
+            .get_many(namespace(1), keys, snapshot_seq)
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 2);
         assert_eq!(results[0], SeqMarked::new_normal(1, value("value1"))); // visible

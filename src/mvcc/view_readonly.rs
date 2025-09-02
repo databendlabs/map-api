@@ -44,7 +44,7 @@ where
     async fn get(&self, space: S, key: K) -> Result<SeqMarked<V>, io::Error>;
 
     /// Get multiple keys atomically. Defaults to sequential `get()` calls.
-    async fn mget(&self, space: S, keys: Vec<K>) -> Result<Vec<SeqMarked<V>>, io::Error> {
+    async fn get_many(&self, space: S, keys: Vec<K>) -> Result<Vec<SeqMarked<V>>, io::Error> {
         let mut results = Vec::with_capacity(keys.len());
         for key in keys {
             let result = self.get(space, key).await?;

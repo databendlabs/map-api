@@ -42,7 +42,11 @@ where
     /// Retrieves multiple keys atomically at the given snapshot sequence.
     ///
     /// Results maintain the same order as input keys. Default implementation calls `get()` sequentially.
-    async fn mget(&self, keys: Vec<K>, snapshot_seq: u64) -> Result<Vec<SeqMarked<V>>, io::Error> {
+    async fn get_many(
+        &self,
+        keys: Vec<K>,
+        snapshot_seq: u64,
+    ) -> Result<Vec<SeqMarked<V>>, io::Error> {
         let mut values = Vec::with_capacity(keys.len());
         for key in keys {
             let value = self.get(key, snapshot_seq).await?;

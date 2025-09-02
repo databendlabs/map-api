@@ -98,7 +98,7 @@ impl<K: Ord + Clone, V> Table<K, V> {
         self.last_seq = last_seq;
     }
 
-    pub fn mget(&self, keys: Vec<K>, upto: u64) -> Vec<SeqMarked<&V>> {
+    pub fn get_many(&self, keys: Vec<K>, upto: u64) -> Vec<SeqMarked<&V>> {
         let mut result = Vec::with_capacity(keys.len());
         for key in keys {
             result.push(self.get(key, upto));
@@ -375,7 +375,7 @@ mod tests {
 
         table.inner.insert(k("k5", 4), Some(s("v5")));
 
-        let res = table.mget(vec![s("k2"), s("k3")], 2);
+        let res = table.get_many(vec![s("k2"), s("k3")], 2);
         let res = res.into_iter().map(|x| x.cloned()).collect::<Vec<_>>();
         assert_eq!(res, vec![
             //
