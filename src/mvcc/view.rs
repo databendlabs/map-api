@@ -159,7 +159,7 @@ where
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
 {
     pub fn new(base: BaseView) -> Self {
-        let seq = base.base_seq();
+        let seq = base.view_seq();
         Self {
             increase_seq_for_tombstone: false,
             changes: BTreeMap::new(),
@@ -220,7 +220,7 @@ where
             self.next_tombstone_seq()
         } else {
             // insert
-            if space.if_increase_seq() {
+            if space.increments_seq() {
                 self.next_normal_seq()
             } else {
                 self.current_normal_seq()
@@ -352,8 +352,8 @@ where
     V: ViewValue,
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
 {
-    fn base_seq(&self) -> InternalSeq {
-        self.base.base_seq()
+    fn view_seq(&self) -> InternalSeq {
+        self.base.view_seq()
     }
 
     async fn get(&self, space: S, key: K) -> Result<SeqMarked<V>, io::Error> {
@@ -390,7 +390,7 @@ mod tests {
     }
 
     impl ViewNamespace for TestSpace {
-        fn if_increase_seq(&self) -> bool {
+        fn increments_seq(&self) -> bool {
             true
         }
     }

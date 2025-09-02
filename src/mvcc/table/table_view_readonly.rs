@@ -64,7 +64,7 @@ where
     K: ViewKey,
     V: ViewValue,
 {
-    fn base_seq(&self) -> InternalSeq {
+    fn view_seq(&self) -> InternalSeq {
         self.base_seq
     }
 
@@ -121,7 +121,7 @@ mod tests {
     }
 
     impl ViewNamespace for TestSpace {
-        fn if_increase_seq(&self) -> bool {
+        fn increments_seq(&self) -> bool {
             true
         }
     }
@@ -165,7 +165,7 @@ mod tests {
         tables.insert(TestSpace::Space1, create_test_table());
 
         let view = TableViewReadonly::new(tables);
-        assert_eq!(view.base_seq(), InternalSeq::new(0));
+        assert_eq!(view.view_seq(), InternalSeq::new(0));
         assert_eq!(view.tables.len(), 1);
     }
 
@@ -177,7 +177,7 @@ mod tests {
         let mut view = TableViewReadonly::new(tables);
         view.base_seq = InternalSeq::new(5);
 
-        assert_eq!(view.base_seq(), InternalSeq::new(5));
+        assert_eq!(view.view_seq(), InternalSeq::new(5));
     }
 
     #[tokio::test]

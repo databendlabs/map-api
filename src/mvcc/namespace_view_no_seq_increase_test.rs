@@ -31,7 +31,7 @@ mod tests {
     }
 
     impl ViewNamespace for TestSpaceNoSeqIncrease {
-        fn if_increase_seq(&self) -> bool {
+        fn increments_seq(&self) -> bool {
             false // This namespace does NOT increase sequence on normal inserts
         }
     }
@@ -290,7 +290,7 @@ mod tests {
         }
 
         impl ViewNamespace for MixedSpace {
-            fn if_increase_seq(&self) -> bool {
+            fn increments_seq(&self) -> bool {
                 match self {
                     MixedSpace::NoIncrement => false,
                     MixedSpace::WithIncrement => true,

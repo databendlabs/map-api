@@ -79,7 +79,7 @@ mod tests {
     struct TestValue(String);
 
     impl ViewNamespace for TestNamespace {
-        fn if_increase_seq(&self) -> bool {
+        fn increments_seq(&self) -> bool {
             true
         }
     }

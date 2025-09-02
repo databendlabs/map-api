@@ -27,5 +27,5 @@ where Self: Clone + Copy + Ord + fmt::Debug + Send + Sync + Unpin + 'static
     /// # Example
     /// Primary record: `(key, seq=5) = "value"`
     /// Index record: `(index_key, seq=5) = key` (shares sequence)
-    fn if_increase_seq(&self) -> bool;
+    fn increments_seq(&self) -> bool;
 }

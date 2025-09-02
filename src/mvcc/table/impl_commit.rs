@@ -66,7 +66,7 @@ mod tests {
     }
 
     impl ViewNamespace for TestSpace {
-        fn if_increase_seq(&self) -> bool {
+        fn increments_seq(&self) -> bool {
             true
         }
     }

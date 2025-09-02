@@ -73,7 +73,7 @@ where
     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
 {
     fn base_seq(&self) -> InternalSeq {
-        self.view.base_seq()
+        self.view.view_seq()
     }
 
     async fn get(&self, key: K) -> Result<SeqMarked<V>, io::Error> {
@@ -117,7 +117,7 @@ mod tests {
     }
 
     impl ViewNamespace for TestSpace {
-        fn if_increase_seq(&self) -> bool {
+        fn increments_seq(&self) -> bool {
             true
         }
     }
