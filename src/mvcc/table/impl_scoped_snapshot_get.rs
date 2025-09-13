@@ -17,12 +17,12 @@ use std::io;
 use seq_marked::SeqMarked;
 
 use super::Table;
-use crate::mvcc::scoped_snapshot_get::ScopedSnapshotGet;
+use crate::mvcc::scoped_seq_bounded_get::ScopedSeqBoundedGet;
 use crate::mvcc::ViewKey;
 use crate::mvcc::ViewValue;
 
 #[async_trait::async_trait]
-impl<K, V> ScopedSnapshotGet<K, V> for Table<K, V>
+impl<K, V> ScopedSeqBoundedGet<K, V> for Table<K, V>
 where
     K: ViewKey,
     V: ViewValue,
@@ -38,7 +38,7 @@ mod tests {
     use seq_marked::SeqMarked;
 
     use super::*;
-    use crate::mvcc::scoped_snapshot_get::ScopedSnapshotGet;
+    use crate::mvcc::scoped_seq_bounded_get::ScopedSeqBoundedGet;
 
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct TestKey(String);
@@ -69,7 +69,7 @@ mod tests {
         let table = create_test_table();
         let snapshot_seq = 10;
 
-        let result = ScopedSnapshotGet::get(&table, key("key1"), snapshot_seq)
+        let result = ScopedSeqBoundedGet::get(&table, key("key1"), snapshot_seq)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_normal(5, value("value1_v2"))); // Most recent version
@@ -81,7 +81,7 @@ mod tests {
         let table = create_test_table();
         let snapshot_seq = 10;
 
-        let result = ScopedSnapshotGet::get(&table, key("key3"), snapshot_seq)
+        let result = ScopedSeqBoundedGet::get(&table, key("key3"), snapshot_seq)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_tombstone(3));
@@ -93,7 +93,7 @@ mod tests {
         let table = create_test_table();
         let snapshot_seq = 10;
 
-        let result = ScopedSnapshotGet::get(&table, key("nonexistent"), snapshot_seq)
+        let result = ScopedSeqBoundedGet::get(&table, key("nonexistent"), snapshot_seq)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_not_found());
@@ -105,7 +105,7 @@ mod tests {
 
         // key4 has seq 10, should be visible with snapshot_seq 10
         let snapshot_seq1 = 10;
-        let result = ScopedSnapshotGet::get(&table, key("key4"), snapshot_seq1)
+        let result = ScopedSeqBoundedGet::get(&table, key("key4"), snapshot_seq1)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_normal(10, value("value4")));
@@ -113,14 +113,14 @@ mod tests {
 
         // key4 has seq 10, should not be visible with snapshot_seq 9
         let snapshot_seq2 = 9;
-        let result = ScopedSnapshotGet::get(&table, key("key4"), snapshot_seq2)
+        let result = ScopedSeqBoundedGet::get(&table, key("key4"), snapshot_seq2)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_not_found());
 
         // key1 with snapshot_seq 3 should return version 1, not version 5
         let snapshot_seq3 = 3;
-        let result = ScopedSnapshotGet::get(&table, key("key1"), snapshot_seq3)
+        let result = ScopedSeqBoundedGet::get(&table, key("key1"), snapshot_seq3)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_normal(1, value("value1")));
@@ -133,7 +133,7 @@ mod tests {
         let keys = vec![key("key1"), key("key2"), key("nonexistent")];
         let snapshot_seq = 10;
 
-        let results = ScopedSnapshotGet::get_many(&table, keys, snapshot_seq)
+        let results = ScopedSeqBoundedGet::get_many(&table, keys, snapshot_seq)
             .await
             .unwrap();
 
@@ -151,7 +151,7 @@ mod tests {
         let keys = vec![];
         let snapshot_seq = 10;
 
-        let results = ScopedSnapshotGet::get_many(&table, keys, snapshot_seq)
+        let results = ScopedSeqBoundedGet::get_many(&table, keys, snapshot_seq)
             .await
             .unwrap();
         assert_eq!(results.len(), 0);
@@ -163,7 +163,7 @@ mod tests {
         let keys = vec![key("key1"), key("key4")]; // key1 has multiple versions, key4 seq=10
         let snapshot_seq = 5;
 
-        let results = ScopedSnapshotGet::get_many(&table, keys, snapshot_seq)
+        let results = ScopedSeqBoundedGet::get_many(&table, keys, snapshot_seq)
             .await
             .unwrap();
 
@@ -183,13 +183,17 @@ mod tests {
         table.insert(key("key"), 5, value("v5")).unwrap();
 
         // Test different snapshot points
-        let result = ScopedSnapshotGet::get(&table, key("key"), 2).await.unwrap();
+        let result = ScopedSeqBoundedGet::get(&table, key("key"), 2)
+            .await
+            .unwrap();
         assert_eq!(result, SeqMarked::new_normal(1, value("v1")));
 
-        let result = ScopedSnapshotGet::get(&table, key("key"), 4).await.unwrap();
+        let result = ScopedSeqBoundedGet::get(&table, key("key"), 4)
+            .await
+            .unwrap();
         assert_eq!(result, SeqMarked::new_normal(3, value("v3")));
 
-        let result = ScopedSnapshotGet::get(&table, key("key"), 10)
+        let result = ScopedSeqBoundedGet::get(&table, key("key"), 10)
             .await
             .unwrap();
         assert_eq!(result, SeqMarked::new_normal(5, value("v5")));

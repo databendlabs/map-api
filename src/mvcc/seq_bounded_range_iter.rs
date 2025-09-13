@@ -12,35 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Namespace-scoped range iteration with snapshot isolation.
-
 use std::ops::RangeBounds;
 
 use seq_marked::SeqMarked;
 
 use crate::mvcc::ViewKey;
+use crate::mvcc::ViewNamespace;
 use crate::mvcc::ViewValue;
 
-/// Read-only range view bound to a namespace with snapshot isolation.
-///
-/// Operations are bounded by `snapshot_seq`, ensuring only data with sequences ≤ `snapshot_seq`
-/// is visible. Pre-scoped to eliminate namespace parameters.
-///
-/// ⚠️ **Tombstone Anomaly**: May observe different deletion states for keys with identical sequences.
-pub trait ScopedSnapshotRangeIter<K, V>
+/// Multi-version range iterator with snapshot isolation.
+pub trait SeqBoundedRangeIter<S, K, V>
 where
+    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
 {
-    /// Returns an iterator of key-value pairs within the specified range.
+    /// Returns iterator of key-value pairs within range at snapshot sequence.
     ///
-    /// Returns the most recent visible version for each key with sequence ≤ `snapshot_seq`.
-    /// Keys are returned in sorted order, including tombstones.
+    /// Returns most recent version for each key with sequence ≤ `snapshot_seq`.
+    /// Keys returned in sorted order, including tombstones.
     fn range_iter<R>(
         &self,
+        space: S,
         range: R,
         snapshot_seq: u64,
-    ) -> impl Iterator<Item = (&K, SeqMarked<&V>)> + Send
+    ) -> impl Iterator<Item = (&K, SeqMarked<&V>)>
     where
         R: RangeBounds<K> + Clone + 'static;
 }

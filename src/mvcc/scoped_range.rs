@@ -28,21 +28,13 @@ use crate::IOResultStream;
 ///
 /// ⚠️ **Tombstone Anomaly**: May observe different deletion states for keys with identical sequences.
 #[async_trait::async_trait]
-pub trait ScopedSnapshotRange<K, V>
+pub trait ScopedRange<K, V>
 where
     Self: Send + Sync,
     K: ViewKey,
     V: ViewValue,
 {
     /// Returns an async stream of key-value pairs within the specified range, consuming self.
-    ///
-    /// Returns the most recent visible version for each key with sequence ≤ `snapshot_seq`.
-    /// Keys are returned in sorted order, including tombstones.
-    async fn range<R>(
-        &self,
-        range: R,
-        snapshot_seq: u64,
-    ) -> Result<IOResultStream<(K, SeqMarked<V>)>, io::Error>
-    where
-        R: RangeBounds<K> + Send + Sync + Clone + 'static;
+    async fn range<R>(&self, range: R) -> Result<IOResultStream<(K, SeqMarked<V>)>, io::Error>
+    where R: RangeBounds<K> + Send + Sync + Clone + 'static;
 }

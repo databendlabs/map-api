@@ -13,11 +13,10 @@
 // limitations under the License.
 
 pub mod errors;
-mod impl_commit;
 mod impl_scoped_snapshot_get;
 mod impl_scoped_snapshot_range_iter;
 pub mod range_iter;
-mod table_view_readonly;
+mod table_snapshot;
 
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
@@ -29,7 +28,8 @@ use errors::InsertError;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use range_iter::RangeIter;
-pub use table_view_readonly::TableViewReadonly;
+pub use table_snapshot::Tables;
+pub use table_snapshot::TablesSnapshot;
 
 use crate::SeqMarked;
 

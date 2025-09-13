@@ -12,31 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::ops::RangeBounds;
-
-use seq_marked::SeqMarked;
-
+use crate::mvcc::ScopedGet;
+use crate::mvcc::ScopedRange;
+use crate::mvcc::ScopedSet;
 use crate::mvcc::ViewKey;
-use crate::mvcc::ViewNamespace;
 use crate::mvcc::ViewValue;
 
-/// Multi-version range iterator with snapshot isolation.
-pub trait SnapshotRangeIter<S, K, V>
+#[async_trait::async_trait]
+pub trait ScopedApi<K, V>
 where
-    S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
+    Self: ScopedGet<K, V>,
+    Self: ScopedSet<K, V>,
+    Self: ScopedRange<K, V>,
 {
-    /// Returns iterator of key-value pairs within range at snapshot sequence.
-    ///
-    /// Returns most recent version for each key with sequence ≤ `snapshot_seq`.
-    /// Keys returned in sorted order, including tombstones.
-    fn range_iter<R>(
-        &self,
-        space: S,
-        range: R,
-        snapshot_seq: u64,
-    ) -> impl Iterator<Item = (&K, SeqMarked<&V>)>
-    where
-        R: RangeBounds<K> + Clone + 'static;
+}
+
+impl<K, V, T> ScopedApi<K, V> for T
+where
+    K: ViewKey,
+    V: ViewValue,
+    T: ScopedGet<K, V>,
+    T: ScopedSet<K, V>,
+    T: ScopedRange<K, V>,
+{
 }
