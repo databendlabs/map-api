@@ -16,7 +16,19 @@ use std::fmt;
 
 /// Trait for types that can be stored as values in MVCC operations.
 ///
-/// Values must be cloneable for versioning and serializable for storage.
+/// # Requirements
+///
+/// Values must satisfy multiple constraints for versioned storage:
+/// - **Cloning**: `Clone` enables efficient versioning and multi-reader access
+/// - **Threading**: `Send + Sync` allows concurrent access across threads
+/// - **Debugging**: `Debug` provides troubleshooting and logging capabilities
+/// - **Async**: `Unpin` enables use in async stream operations
+///
+/// # Automatic Implementation
+///
+/// This trait is automatically implemented for any type that meets the trait bounds.
+/// Common value types include `String`, primitive types, `Vec<T>`, serializable structs,
+/// and enum variants that derive the required traits.
 pub trait ViewValue: fmt::Debug + Clone + Send + Sync + Unpin + 'static {}
 
 impl<V> ViewValue for V where V: fmt::Debug + Clone + Send + Sync + Unpin + 'static {}

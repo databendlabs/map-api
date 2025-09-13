@@ -14,10 +14,12 @@
 
 //! Snapshot-based read operations for multi-version key-value storage with namespace isolation.
 
+use std::collections::BTreeMap;
 use std::io;
 
 use seq_marked::SeqMarked;
 
+use crate::mvcc::Table;
 use crate::mvcc::ViewKey;
 use crate::mvcc::ViewNamespace;
 use crate::mvcc::ViewValue;
@@ -28,7 +30,7 @@ use crate::mvcc::ViewValue;
 ///
 /// ⚠️ **Tombstone Anomaly**: May observe different deletion states due to sequence reuse.
 #[async_trait::async_trait]
-pub trait SnapshotGet<S, K, V>
+pub trait SeqBoundedGet<S, K, V>
 where
     Self: Send + Sync,
     S: ViewNamespace,
@@ -56,6 +58,25 @@ where
             values.push(value);
         }
         Ok(values)
+    }
+}
+
+#[async_trait::async_trait]
+impl<S, K, V> SeqBoundedGet<S, K, V> for BTreeMap<S, Table<K, V>>
+where
+    Self: Send + Sync,
+    S: ViewNamespace,
+    K: ViewKey,
+    V: ViewValue,
+{
+    async fn get(&self, space: S, key: K, snapshot_seq: u64) -> Result<SeqMarked<V>, io::Error> {
+        let Some(table) = self.get(&space) else {
+            return Ok(SeqMarked::new_not_found());
+        };
+
+        let got = table.get(key, snapshot_seq).cloned();
+
+        Ok(got)
     }
 }
 
@@ -125,7 +146,7 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl SnapshotGet<TestNamespace, TestKey, TestValue> for MockSnapshotReader {
+    impl SeqBoundedGet<TestNamespace, TestKey, TestValue> for MockSnapshotReader {
         async fn get(
             &self,
             space: TestNamespace,
@@ -261,5 +282,48 @@ mod tests {
         assert_eq!(results[0], SeqMarked::new_normal(1, value("value1"))); // visible
         assert!(*results[0].internal_seq() <= snapshot_seq);
         assert_eq!(results[1], SeqMarked::new_not_found()); // not visible due to seq filter
+    }
+
+    #[tokio::test]
+    async fn test_btree_map_snapshot_get_implementation() {
+        use super::SeqBoundedGet;
+
+        let mut map = BTreeMap::new();
+        let mut table = Table::new();
+        table.insert(key("k"), 1, value("v")).unwrap();
+        table.insert_tombstone(key("deleted"), 2).unwrap();
+        map.insert(namespace(1), table);
+
+        // Test existing key
+        let result = SeqBoundedGet::get(&map, namespace(1), key("k"), 10)
+            .await
+            .unwrap();
+        assert_eq!(result, SeqMarked::new_normal(1, value("v")));
+
+        // Test deleted key
+        let result = SeqBoundedGet::get(&map, namespace(1), key("deleted"), 10)
+            .await
+            .unwrap();
+        assert_eq!(result, SeqMarked::new_tombstone(2));
+
+        // Test missing key
+        let result = SeqBoundedGet::get(&map, namespace(1), key("missing"), 10)
+            .await
+            .unwrap();
+        assert_eq!(result, SeqMarked::new_not_found());
+
+        // Test missing namespace
+        let result = SeqBoundedGet::get(&map, namespace(99), key("k"), 10)
+            .await
+            .unwrap();
+        assert_eq!(result, SeqMarked::new_not_found());
+
+        // Test get_many
+        let keys = vec![key("k"), key("missing")];
+        let results = SeqBoundedGet::get_many(&map, namespace(1), keys, 10)
+            .await
+            .unwrap();
+        assert_eq!(results[0], SeqMarked::new_normal(1, value("v")));
+        assert_eq!(results[1], SeqMarked::new_not_found());
     }
 }

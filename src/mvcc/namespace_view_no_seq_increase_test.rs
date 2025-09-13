@@ -20,7 +20,7 @@ mod tests {
     use seq_marked::InternalSeq;
     use seq_marked::SeqMarked;
 
-    use crate::mvcc::table::TableViewReadonly;
+    use crate::mvcc::table::TablesSnapshot;
     use crate::mvcc::view::View;
     use crate::mvcc::view_namespace::ViewNamespace;
     use crate::mvcc::Table;
@@ -50,16 +50,16 @@ mod tests {
         TestValue(s.to_string())
     }
 
-    fn create_base_view() -> TableViewReadonly<TestSpaceNoSeqIncrease, TestKey, TestValue> {
+    fn create_base_view() -> TablesSnapshot<TestSpaceNoSeqIncrease, TestKey, TestValue> {
         let mut table = Table::new();
         table.insert(key("base_k1"), 1, value("base_v1")).unwrap();
         table.insert(key("base_k2"), 2, value("base_v2")).unwrap();
 
         let mut tables = BTreeMap::new();
         tables.insert(TestSpaceNoSeqIncrease::Space1, table);
-        let mut view = TableViewReadonly::new(tables);
-        view.base_seq = InternalSeq::new(10); // Set high enough to see all base data
-        view
+        // Set high enough to see all base data
+
+        TablesSnapshot::new(InternalSeq::new(10), tables)
     }
 
     #[tokio::test]
@@ -299,7 +299,8 @@ mod tests {
         }
 
         let tables = BTreeMap::new();
-        let base = TableViewReadonly::<MixedSpace, TestKey, TestValue>::new(tables);
+        let base =
+            TablesSnapshot::<MixedSpace, TestKey, TestValue>::new(InternalSeq::new(10), tables);
         let mut view = View::new(base).with_initial_seq(InternalSeq::new(100));
 
         let initial_seq = view.last_seq;
@@ -339,7 +340,10 @@ mod tests {
         // Test with empty base view (starts at sequence 0)
         // This demonstrates that the constraint applies even at sequence 0
         let tables = BTreeMap::new();
-        let base = TableViewReadonly::<TestSpaceNoSeqIncrease, TestKey, TestValue>::new(tables);
+        let base = TablesSnapshot::<TestSpaceNoSeqIncrease, TestKey, TestValue>::new(
+            InternalSeq::new(1),
+            tables,
+        );
         let mut view = View::new(base).with_initial_seq(InternalSeq::new(1));
 
         assert_eq!(view.last_seq, InternalSeq::new(1));

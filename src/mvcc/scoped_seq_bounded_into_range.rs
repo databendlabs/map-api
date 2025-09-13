@@ -20,7 +20,7 @@ use std::ops::RangeBounds;
 use futures_util::StreamExt;
 use seq_marked::SeqMarked;
 
-use crate::mvcc::scoped_snapshot_range_iter::ScopedSnapshotRangeIter;
+use crate::mvcc::scoped_seq_bounded_range_iter::ScopedSeqBoundedRangeIter;
 use crate::mvcc::ViewKey;
 use crate::mvcc::ViewValue;
 use crate::IOResultStream;
@@ -56,7 +56,7 @@ impl<K, V, Owned> ScopedSnapshotIntoRange<K, V> for Owned
 where
     K: ViewKey,
     V: ViewValue,
-    Owned: ScopedSnapshotRangeIter<K, V> + Send + Sync + 'static,
+    Owned: ScopedSeqBoundedRangeIter<K, V> + Send + Sync + 'static,
 {
     async fn into_range<R>(
         self,
@@ -80,7 +80,7 @@ pub(crate) async fn owned_range_iter_to_stream<K, V, R, Owned>(
     K: ViewKey,
     V: ViewValue,
     R: RangeBounds<K> + Clone + Send + Sync + 'static,
-    Owned: ScopedSnapshotRangeIter<K, V> + Send + Sync + 'static,
+    Owned: ScopedSeqBoundedRangeIter<K, V> + Send + Sync + 'static,
 {
     let it = table.range_iter(range, snapshot_seq);
 
@@ -96,7 +96,7 @@ mod tests {
     use futures_util::TryStreamExt;
     use seq_marked::SeqMarked;
 
-    use crate::mvcc::scoped_snapshot_into_range::ScopedSnapshotIntoRange;
+    use crate::mvcc::scoped_seq_bounded_into_range::ScopedSnapshotIntoRange;
     use crate::mvcc::Table;
 
     #[tokio::test]

@@ -17,11 +17,11 @@ use std::ops::RangeBounds;
 use seq_marked::SeqMarked;
 
 use super::Table;
-use crate::mvcc::scoped_snapshot_range_iter::ScopedSnapshotRangeIter;
+use crate::mvcc::scoped_seq_bounded_range_iter::ScopedSeqBoundedRangeIter;
 use crate::mvcc::ViewKey;
 use crate::mvcc::ViewValue;
 
-impl<K, V> ScopedSnapshotRangeIter<K, V> for Table<K, V>
+impl<K, V> ScopedSeqBoundedRangeIter<K, V> for Table<K, V>
 where
     K: ViewKey,
     V: ViewValue,
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<K, V, T> ScopedSnapshotRangeIter<K, V> for T
+impl<K, V, T> ScopedSeqBoundedRangeIter<K, V> for T
 where
     K: ViewKey,
     V: ViewValue,
@@ -63,7 +63,7 @@ mod tests {
     use seq_marked::SeqMarked;
 
     use super::*;
-    use crate::mvcc::scoped_snapshot_range_iter::ScopedSnapshotRangeIter;
+    use crate::mvcc::scoped_seq_bounded_range_iter::ScopedSeqBoundedRangeIter;
 
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct TestKey(String);
@@ -95,7 +95,7 @@ mod tests {
         let table = Arc::new(table);
         let snapshot_seq = 10;
 
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., snapshot_seq);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., snapshot_seq);
 
         assert_eq!(iter.collect::<Vec<_>>(), vec![
             (&key("key1"), SeqMarked::new_normal(5, &value("value1_v2"))),
@@ -110,7 +110,7 @@ mod tests {
         let table = create_test_table();
         let snapshot_seq = 10;
 
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., snapshot_seq);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., snapshot_seq);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results, vec![
@@ -127,7 +127,7 @@ mod tests {
         let snapshot_seq = 10;
 
         let iter =
-            ScopedSnapshotRangeIter::range_iter(&table, key("key1")..=key("key2"), snapshot_seq);
+            ScopedSeqBoundedRangeIter::range_iter(&table, key("key1")..=key("key2"), snapshot_seq);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results, vec![
@@ -141,7 +141,7 @@ mod tests {
         let table = create_test_table();
         let snapshot_seq = 5;
 
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., snapshot_seq);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., snapshot_seq);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results, vec![
@@ -156,7 +156,7 @@ mod tests {
         let table: Table<TestKey, TestValue> = Table::new();
         let snapshot_seq = 10;
 
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., snapshot_seq);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., snapshot_seq);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results.len(), 0);
@@ -172,7 +172,7 @@ mod tests {
         table.insert(key("key"), 5, value("v5")).unwrap();
 
         // Test different snapshot points
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., 2);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., 2);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results, vec![(
@@ -180,7 +180,7 @@ mod tests {
             SeqMarked::new_normal(1, &value("v1"))
         ),]);
 
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., 4);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., 4);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results, vec![(
@@ -188,7 +188,7 @@ mod tests {
             SeqMarked::new_normal(3, &value("v3"))
         ),]);
 
-        let iter = ScopedSnapshotRangeIter::range_iter(&table, .., 10);
+        let iter = ScopedSeqBoundedRangeIter::range_iter(&table, .., 10);
         let results: Vec<_> = iter.collect();
 
         assert_eq!(results, vec![(
