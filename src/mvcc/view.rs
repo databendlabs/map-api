@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::io;
 use std::ops::RangeBounds;
 
@@ -26,11 +27,11 @@ use stream_more::StreamMore;
 use crate::compact::compact_seq_marked_pair;
 use crate::mvcc::commit::Commit;
 use crate::mvcc::key::ViewKey;
-use crate::mvcc::namespace_view::NamespaceView;
+use crate::mvcc::seq_bounded_read::SeqBoundedRead;
+use crate::mvcc::snapshot::Snapshot;
 use crate::mvcc::table::Table;
 use crate::mvcc::value::ViewValue;
 use crate::mvcc::view_namespace::ViewNamespace;
-use crate::mvcc::view_readonly::ViewReadonly;
 use crate::util;
 use crate::IOResultStream;
 
@@ -128,12 +129,12 @@ use crate::IOResultStream;
 /// - `V`: value type
 /// - `BaseView`: the base view that this view is based on.
 ///   `BaseView` is usually a `ViewRo` that is created from the snapshot of the underlying storage.
-pub struct View<S, K, V, BaseView>
+pub struct View<S, K, V, D>
 where
     S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
-    BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
+    D: SeqBoundedRead<S, K, V> + Commit<S, K, V>,
 {
     /// Whether to increase the seq for tombstone insertion.
     ///
@@ -148,18 +149,39 @@ where
     /// This seq will be updated to the underlaying [`Table`] when the transaction is committed.
     pub(crate) last_seq: InternalSeq,
 
-    pub(crate) base: BaseView,
+    pub(crate) base: Snapshot<S, K, V, D>,
 }
 
-impl<S, K, V, BaseView> View<S, K, V, BaseView>
+impl<S, K, V, D> fmt::Debug for View<S, K, V, D>
 where
     S: ViewNamespace,
     K: ViewKey,
     V: ViewValue,
-    BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
+    D: SeqBoundedRead<S, K, V> + Commit<S, K, V>,
+    D: fmt::Debug,
 {
-    pub fn new(base: BaseView) -> Self {
-        let seq = base.view_seq();
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("View")
+            .field(
+                "increase_seq_for_tombstone",
+                &self.increase_seq_for_tombstone,
+            )
+            .field("changes", &self.changes)
+            .field("last_seq", &self.last_seq)
+            .field("base", &self.base)
+            .finish()
+    }
+}
+
+impl<S, K, V, D> View<S, K, V, D>
+where
+    S: ViewNamespace,
+    K: ViewKey,
+    V: ViewValue,
+    D: SeqBoundedRead<S, K, V> + Commit<S, K, V>,
+{
+    pub fn new(base: Snapshot<S, K, V, D>) -> Self {
+        let seq = base.snapshot_seq();
         Self {
             increase_seq_for_tombstone: false,
             changes: BTreeMap::new(),
@@ -176,6 +198,11 @@ where
     pub fn with_initial_seq(mut self, seq: InternalSeq) -> Self {
         self.last_seq = seq;
         self
+    }
+
+    /// Return the reference to the snapshot this view is based on.
+    pub fn snapshot(&self) -> &Snapshot<S, K, V, D> {
+        &self.base
     }
 
     fn current_normal_seq(&self) -> SeqMarked<()> {
@@ -204,7 +231,7 @@ where
         SeqMarked::new_tombstone(*self.last_seq)
     }
 
-    pub fn base(&self) -> &BaseView {
+    pub fn base(&self) -> &Snapshot<S, K, V, D> {
         &self.base
     }
 
@@ -334,43 +361,39 @@ where
         Ok(coalesce.boxed())
     }
 
-    pub async fn commit(mut self) -> Result<BaseView, io::Error> {
-        self.base.commit(self.last_seq, self.changes).await?;
-        Ok(self.base)
-    }
-
-    pub fn namespace(&mut self, space: S) -> NamespaceView<'_, S, K, V, BaseView> {
-        NamespaceView { space, view: self }
+    pub async fn commit(self) -> Result<D, io::Error> {
+        let d = self.base.commit(self.last_seq, self.changes).await?;
+        Ok(d)
     }
 }
 
-#[async_trait::async_trait]
-impl<S, K, V, BaseView> ViewReadonly<S, K, V> for View<S, K, V, BaseView>
-where
-    S: ViewNamespace,
-    K: ViewKey,
-    V: ViewValue,
-    BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
-{
-    fn view_seq(&self) -> InternalSeq {
-        self.base.view_seq()
-    }
-
-    async fn get(&self, space: S, key: K) -> Result<SeqMarked<V>, io::Error> {
-        self.base.get(space, key).await
-    }
-
-    async fn range<R>(
-        &self,
-        space: S,
-        range: R,
-    ) -> Result<IOResultStream<(K, SeqMarked<V>)>, io::Error>
-    where
-        R: RangeBounds<K> + Send + Sync + Clone + 'static,
-    {
-        self.base.range(space, range).await
-    }
-}
+// #[async_trait::async_trait]
+// impl<S, K, V, BaseView> ViewReadonly<S, K, V> for View<S, K, V, BaseView>
+// where
+//     S: ViewNamespace,
+//     K: ViewKey,
+//     V: ViewValue,
+//     BaseView: ViewReadonly<S, K, V> + Commit<S, K, V>,
+// {
+//     fn view_seq(&self) -> InternalSeq {
+//         self.base.view_seq()
+//     }
+//
+//     async fn get(&self, space: S, key: K) -> Result<SeqMarked<V>, io::Error> {
+//         self.base.get(space, key).await
+//     }
+//
+//     async fn range<R>(
+//         &self,
+//         space: S,
+//         range: R,
+//     ) -> Result<IOResultStream<(K, SeqMarked<V>)>, io::Error>
+//     where
+//         R: RangeBounds<K> + Send + Sync + Clone + 'static,
+//     {
+//         self.base.range(space, range).await
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -381,7 +404,9 @@ mod tests {
     use seq_marked::SeqMarked;
 
     use super::*;
-    use crate::mvcc::table::TableViewReadonly;
+    use crate::mvcc::seq_bounded_get::SeqBoundedGet;
+    use crate::mvcc::table::Tables;
+    use crate::mvcc::table::TablesSnapshot;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     enum TestSpace {
@@ -408,33 +433,32 @@ mod tests {
         TestValue(s.to_string())
     }
 
-    fn create_base_view() -> TableViewReadonly<TestSpace, TestKey, TestValue> {
+    fn create_base_snapshot() -> TablesSnapshot<TestSpace, TestKey, TestValue> {
         let mut table = Table::new();
         table.insert(key("base_k1"), 1, value("base_v1")).unwrap();
         table.insert(key("base_k2"), 2, value("base_v2")).unwrap();
 
         let mut tables = BTreeMap::new();
         tables.insert(TestSpace::Space1, table);
-        let mut view = TableViewReadonly::new(tables);
-        view.base_seq = InternalSeq::new(10); // Set high enough to see all base data
-        view
+
+        TablesSnapshot::new(InternalSeq::new(10), tables)
     }
 
     fn create_view(
-        base: TableViewReadonly<TestSpace, TestKey, TestValue>,
-    ) -> View<TestSpace, TestKey, TestValue, TableViewReadonly<TestSpace, TestKey, TestValue>> {
+        base: TablesSnapshot<TestSpace, TestKey, TestValue>,
+    ) -> View<TestSpace, TestKey, TestValue, Tables<TestSpace, TestKey, TestValue>> {
         View::new(base)
     }
 
     fn create_view_with_tombstone_seq(
-        base: TableViewReadonly<TestSpace, TestKey, TestValue>,
-    ) -> View<TestSpace, TestKey, TestValue, TableViewReadonly<TestSpace, TestKey, TestValue>> {
+        base: TablesSnapshot<TestSpace, TestKey, TestValue>,
+    ) -> View<TestSpace, TestKey, TestValue, Tables<TestSpace, TestKey, TestValue>> {
         View::new(base).with_tombstone_seq_increment(true)
     }
 
     #[tokio::test]
     async fn test_set_normal_value() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
 
@@ -449,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_tombstone_no_seq_increase() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // First insert
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
@@ -469,7 +493,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_tombstone_with_seq_increase() {
-        let mut view = create_view_with_tombstone_seq(create_base_view());
+        let mut view = create_view_with_tombstone_seq(create_base_snapshot());
 
         // First insert
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
@@ -489,7 +513,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mget_from_base_only() {
-        let view = create_view(create_base_view());
+        let view = create_view(create_base_snapshot());
 
         let keys = vec![key("base_k1"), key("base_k2")];
         let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
@@ -501,7 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mget_from_changes_only() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         view.set(TestSpace::Space1, key("new_k1"), Some(value("new_v1")));
         view.set(TestSpace::Space1, key("new_k2"), Some(value("new_v2")));
 
@@ -526,7 +550,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mget_merge_base_and_changes() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         // Override base value
         view.set(TestSpace::Space1, key("base_k1"), Some(value("updated_v1")));
         // Add new value
@@ -554,7 +578,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mget_tombstone_override() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         // Delete base value
         view.set(TestSpace::Space1, key("base_k1"), None);
 
@@ -572,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mget_nonexistent_space() {
-        let view = create_view(create_base_view());
+        let view = create_view(create_base_snapshot());
 
         let keys = vec![key("k1")];
         let result = view.get_many(TestSpace::Space2, keys).await.unwrap();
@@ -583,7 +607,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_from_base_only() {
-        let view = create_view(create_base_view());
+        let view = create_view(create_base_snapshot());
 
         let mut stream = view.range(TestSpace::Space1, ..).await.unwrap();
         let mut results = Vec::new();
@@ -604,7 +628,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_from_changes_only() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         view.set(TestSpace::Space2, key("new_k1"), Some(value("new_v1")));
         view.set(TestSpace::Space2, key("new_k2"), Some(value("new_v2")));
 
@@ -638,7 +662,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_merge_base_and_changes() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         view.set(TestSpace::Space1, key("base_k1"), Some(value("updated_v1")));
         view.set(TestSpace::Space1, key("new_k1"), Some(value("new_v1")));
 
@@ -680,7 +704,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_nonexistent_space() {
-        let view = create_view(create_base_view());
+        let view = create_view(create_base_snapshot());
 
         let mut stream = view.range(TestSpace::Space2, ..).await.unwrap();
         let result = stream.next().await;
@@ -690,7 +714,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_commit() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
         view.set(TestSpace::Space2, key("k2"), Some(value("v2")));
 
@@ -708,22 +732,31 @@ mod tests {
 
         assert_eq!(view.changes.len(), 2);
 
-        let base_view = view.commit().await.unwrap();
+        let base_data = view.commit().await.unwrap();
 
         // Verify the base view contains the committed changes
         let keys = vec![key("k1")];
-        let result = base_view.get_many(TestSpace::Space1, keys).await.unwrap();
+        let result = base_data
+            .get_many(TestSpace::Space1, keys, u64::MAX)
+            .await
+            .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_normal(11, value("v1")));
 
         let keys = vec![key("k2")];
-        let result = base_view.get_many(TestSpace::Space2, keys).await.unwrap();
+        let result = base_data
+            .get_many(TestSpace::Space2, keys, u64::MAX)
+            .await
+            .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], SeqMarked::new_normal(12, value("v2")));
 
         // Should also still contain original base data
         let keys = vec![key("base_k1"), key("base_k2")];
-        let result = base_view.get_many(TestSpace::Space1, keys).await.unwrap();
+        let result = base_data
+            .get_many(TestSpace::Space1, keys, u64::MAX)
+            .await
+            .unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], SeqMarked::new_normal(1, value("base_v1")));
         assert_eq!(result[1], SeqMarked::new_normal(2, value("base_v2")));
@@ -731,7 +764,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sequence_ordering() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
         assert_eq!(view.last_seq, InternalSeq::new(11));
@@ -760,7 +793,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_spaces() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
         view.set(TestSpace::Space2, key("k2"), Some(value("v2")));
@@ -785,7 +818,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_complex_scenario() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Insert new values
         view.set(TestSpace::Space1, key("new_k1"), Some(value("new_v1")));
@@ -828,31 +861,33 @@ mod tests {
     #[tokio::test]
     async fn test_empty_base_view() {
         let tables = BTreeMap::new(); // Completely empty base
-        let base = TableViewReadonly::new(tables);
+        let base = TablesSnapshot::new(InternalSeq::new(1), tables);
         let mut view = create_view(base);
 
         // Operations on completely empty view
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
         view.set(TestSpace::Space1, key("k2"), None);
 
+        println!("{:#?}", view);
+
         // Verify operations work on empty base
         let table = &view.changes[&TestSpace::Space1];
         assert_eq!(
             table.get(key("k1"), 2),
-            SeqMarked::new_normal(1, &value("v1"))
+            SeqMarked::new_normal(2, &value("v1"))
         );
-        assert_eq!(table.get(key("k2"), 2), SeqMarked::new_tombstone(1));
+        assert_eq!(table.get(key("k2"), 2), SeqMarked::new_tombstone(2));
 
         // mget should work with empty base
         let keys = vec![key("k1"), key("k2")];
         let result = view.get_many(TestSpace::Space1, keys).await.unwrap();
-        assert_eq!(result[0], SeqMarked::new_normal(1, value("v1")));
-        assert_eq!(result[1], SeqMarked::new_tombstone(1));
+        assert_eq!(result[0], SeqMarked::new_normal(2, value("v1")));
+        assert_eq!(result[1], SeqMarked::new_tombstone(2));
     }
 
     #[tokio::test]
     async fn test_zero_initial_sequence() {
-        let mut view = View::new(create_base_view()).with_initial_seq(InternalSeq::new(0));
+        let mut view = View::new(create_base_snapshot()).with_initial_seq(InternalSeq::new(0));
 
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
         assert_eq!(view.last_seq, InternalSeq::new(1));
@@ -872,7 +907,7 @@ mod tests {
     #[tokio::test]
     async fn test_max_sequence_boundary() {
         let mut view =
-            View::new(create_base_view()).with_initial_seq(InternalSeq::new(u64::MAX - 2));
+            View::new(create_base_snapshot()).with_initial_seq(InternalSeq::new(u64::MAX - 2));
 
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
         assert_eq!(view.last_seq, InternalSeq::new(u64::MAX - 1));
@@ -889,7 +924,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tombstone_resurrection() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Delete base key
         view.set(TestSpace::Space1, key("base_k1"), None);
@@ -916,7 +951,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_updates_same_key() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Multiple updates to same key
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
@@ -951,7 +986,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_key_lists() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
 
         // Empty key list should return empty result
@@ -965,7 +1000,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_bounded_operations() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
         view.set(TestSpace::Space1, key("a"), Some(value("va")));
         view.set(TestSpace::Space1, key("c"), Some(value("vc")));
         view.set(TestSpace::Space1, key("e"), Some(value("ve")));
@@ -1017,7 +1052,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_with_all_tombstones() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Delete all base keys and add only tombstones
         view.set(TestSpace::Space1, key("base_k1"), None);
@@ -1041,7 +1076,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_single_key() {
-        let view = create_view(create_base_view());
+        let view = create_view(create_base_snapshot());
 
         // Single key range
         let mut stream = view
@@ -1062,7 +1097,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_range_empty_result() {
-        let view = create_view(create_base_view());
+        let view = create_view(create_base_snapshot());
 
         // Range that matches no keys
         let mut stream = view
@@ -1089,8 +1124,8 @@ mod tests {
 
         let mut tables = BTreeMap::new();
         tables.insert(TestSpace::Space1, table);
-        let mut base = TableViewReadonly::new(tables);
-        base.base_seq = InternalSeq::new(15); // Can only see k1, not k2
+        // Can only see k1, not k2
+        let base = TablesSnapshot::new(InternalSeq::new(15), tables);
 
         let view = create_view(base);
 
@@ -1104,7 +1139,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_large_key_value_operations() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Large key and value
         let large_key = key(&"x".repeat(1000));
@@ -1129,7 +1164,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_many_keys_operation() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Insert many keys
         for i in 0..100 {
@@ -1158,7 +1193,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sequence_exact_match_boundary() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         view.set(TestSpace::Space1, key("k1"), Some(value("v1"))); // seq 6
         view.set(TestSpace::Space1, key("k2"), Some(value("v2"))); // seq 7
@@ -1174,7 +1209,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cross_space_sequence_isolation() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Operations in different spaces should share sequence counter
         view.set(TestSpace::Space1, key("k1"), Some(value("v1"))); // seq 6
@@ -1203,7 +1238,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_return_value() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Test normal value insertion
         let order_key1 = view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
@@ -1224,7 +1259,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_return_value_with_increment() {
-        let mut view = create_view_with_tombstone_seq(create_base_view());
+        let mut view = create_view_with_tombstone_seq(create_base_snapshot());
 
         // Test normal value insertion
         let order_key1 = view.set(TestSpace::Space1, key("k1"), Some(value("v1")));
@@ -1241,7 +1276,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_nonexistent() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         let (old_value, new_value) = view
             .fetch_and_set(TestSpace::Space1, key("new_key"), Some(value("new_value")))
@@ -1260,7 +1295,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_existing_from_base() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         let (old_value, new_value) = view
             .fetch_and_set(
@@ -1286,7 +1321,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_existing_from_changes() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // First set a value to create changes
         view.set(
@@ -1319,7 +1354,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_tombstone() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         let (old_value, new_value) = view
             .fetch_and_set(TestSpace::Space1, key("base_k1"), None)
@@ -1338,7 +1373,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_cross_space() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Set value in Space1
         let (old1, new1) = view
@@ -1364,7 +1399,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_tombstone_resurrection() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // First delete a base key
         let (old1, new1) = view
@@ -1396,7 +1431,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_and_set_delete_nonexistent() {
-        let mut view = create_view(create_base_view());
+        let mut view = create_view(create_base_snapshot());
 
         // Try to delete a key that doesn't exist
         let (old_value, new_value) = view

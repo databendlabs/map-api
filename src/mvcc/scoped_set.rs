@@ -16,7 +16,7 @@ use std::io;
 
 use seq_marked::SeqMarked;
 
-use crate::mvcc::ScopedViewReadonly;
+use crate::mvcc::ScopedGet;
 use crate::mvcc::ViewKey;
 use crate::mvcc::ViewValue;
 
@@ -26,15 +26,15 @@ use crate::mvcc::ViewValue;
 /// in the view implementation, eliminating the need to specify namespace
 /// parameters for each operation.
 ///
-/// Extends [`ScopedViewReadonly`] with write operations:
+/// Extends [`ScopedGet`] with write operations:
 /// - [`set`](Self::set) - Set or delete values within the scoped namespace  
 /// - [`fetch_and_set`](Self::fetch_and_set) - Atomically get old value and set new value, returning both
 #[async_trait::async_trait]
-pub trait ScopedView<K, V>
+pub trait ScopedSet<K, V>
 where
     K: ViewKey,
     V: ViewValue,
-    Self: ScopedViewReadonly<K, V>,
+    Self: ScopedGet<K, V>,
 {
     /// Fetch the current value of a key and set it to a new value atomically.
     ///
@@ -75,14 +75,10 @@ where
 mod tests {
     use std::collections::BTreeMap;
     use std::io;
-    use std::ops::RangeBounds;
 
-    use futures::StreamExt;
-    use seq_marked::InternalSeq;
     use seq_marked::SeqMarked;
 
     use super::*;
-    use crate::IOResultStream;
 
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct TestKey(String);
@@ -99,7 +95,6 @@ mod tests {
 
     // Mock implementation for testing
     struct MockScopedView {
-        base_seq: InternalSeq,
         data: BTreeMap<TestKey, SeqMarked<TestValue>>,
     }
 
@@ -111,46 +106,22 @@ mod tests {
                 SeqMarked::new_normal(1, value("initial_value")),
             );
 
-            Self {
-                base_seq: InternalSeq::new(5),
-                data,
-            }
+            Self { data }
         }
     }
 
     #[async_trait::async_trait]
-    impl ScopedViewReadonly<TestKey, TestValue> for MockScopedView {
-        fn base_seq(&self) -> InternalSeq {
-            self.base_seq
-        }
-
+    impl ScopedGet<TestKey, TestValue> for MockScopedView {
         async fn get(&self, key: TestKey) -> Result<SeqMarked<TestValue>, io::Error> {
             match self.data.get(&key) {
                 Some(value) => Ok(value.clone()),
                 None => Ok(SeqMarked::new_not_found()),
             }
         }
-
-        async fn range<R>(
-            &self,
-            range: R,
-        ) -> Result<IOResultStream<(TestKey, SeqMarked<TestValue>)>, io::Error>
-        where
-            R: RangeBounds<TestKey> + Send + Sync + Clone + 'static,
-        {
-            let items: Vec<_> = self
-                .data
-                .range(range)
-                .map(|(k, v)| Ok((k.clone(), v.clone())))
-                .collect();
-
-            let stream = futures::stream::iter(items);
-            Ok(Box::pin(stream))
-        }
     }
 
     #[async_trait::async_trait]
-    impl ScopedView<TestKey, TestValue> for MockScopedView {
+    impl ScopedSet<TestKey, TestValue> for MockScopedView {
         fn set(&mut self, key: TestKey, value: Option<TestValue>) -> SeqMarked<()> {
             match value {
                 Some(v) => {
@@ -220,40 +191,8 @@ mod tests {
         // Should return the order key
         assert_eq!(order_key, SeqMarked::new_normal(2, ()));
 
-        assert_eq!(view.base_seq(), InternalSeq::new(5));
         let result = view.get(key("test_key")).await.unwrap();
         assert_eq!(result, SeqMarked::new_normal(2, value("test_value")));
-    }
-
-    #[tokio::test]
-    async fn test_scoped_view_trait_range_after_set() {
-        let mut view = MockScopedView::new();
-        let order_key = view.set(key("added_key"), Some(value("added_value")));
-
-        // Should return the order key
-        assert_eq!(order_key, SeqMarked::new_normal(2, ()));
-
-        let mut stream = view.range(..).await.unwrap();
-        let mut results = Vec::new();
-        while let Some(result) = stream.next().await {
-            results.push(result.unwrap());
-        }
-
-        assert_eq!(results.len(), 2);
-        assert_eq!(
-            results[0],
-            (
-                key("added_key"),
-                SeqMarked::new_normal(2, value("added_value"))
-            )
-        );
-        assert_eq!(
-            results[1],
-            (
-                key("initial_key"),
-                SeqMarked::new_normal(1, value("initial_value"))
-            )
-        );
     }
 
     #[tokio::test]

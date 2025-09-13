@@ -27,7 +27,7 @@ use crate::mvcc::ViewValue;
 ///
 /// ⚠️ **Tombstone Anomaly**: May observe different deletion states for keys with identical sequences.
 #[async_trait::async_trait]
-pub trait ScopedSnapshotGet<K, V>
+pub trait ScopedSeqBoundedGet<K, V>
 where
     Self: Send + Sync,
     K: ViewKey,
@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl ScopedSnapshotGet<TestKey, TestValue> for MockScopedSnapshotReader {
+    impl ScopedSeqBoundedGet<TestKey, TestValue> for MockScopedSnapshotReader {
         async fn get(
             &self,
             key: TestKey,

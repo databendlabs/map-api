@@ -31,7 +31,7 @@ use crate::IOResultStream;
 ///
 /// ⚠️ **Tombstone Anomaly**: May observe different deletion states due to sequence reuse.
 #[async_trait::async_trait]
-pub trait SnapshotIntoRange<S, K, V>
+pub trait SeqBoundedIntoRange<S, K, V>
 where
     Self: Send + Sync,
     S: ViewNamespace,
