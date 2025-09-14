@@ -32,7 +32,7 @@ use crate::IOResultStream;
 ///
 /// ⚠️ **Tombstone Anomaly**: May observe different deletion states for keys with identical sequences.
 #[async_trait::async_trait]
-pub trait ScopedSnapshotIntoRange<K, V>
+pub trait ScopedSeqBoundedIntoRange<K, V>
 where
     Self: Send + Sync,
     K: ViewKey,
@@ -52,7 +52,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<K, V, Owned> ScopedSnapshotIntoRange<K, V> for Owned
+impl<K, V, Owned> ScopedSeqBoundedIntoRange<K, V> for Owned
 where
     K: ViewKey,
     V: ViewValue,
@@ -96,7 +96,7 @@ mod tests {
     use futures_util::TryStreamExt;
     use seq_marked::SeqMarked;
 
-    use crate::mvcc::scoped_seq_bounded_into_range::ScopedSnapshotIntoRange;
+    use crate::mvcc::scoped_seq_bounded_into_range::ScopedSeqBoundedIntoRange;
     use crate::mvcc::Table;
 
     #[tokio::test]

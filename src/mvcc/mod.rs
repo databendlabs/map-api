@@ -82,7 +82,7 @@ pub use self::scoped_get::ScopedGet;
 pub use self::scoped_range::ScopedRange;
 pub use self::scoped_read::ScopedRead;
 pub use self::scoped_seq_bounded_get::ScopedSeqBoundedGet;
-pub use self::scoped_seq_bounded_into_range::ScopedSnapshotIntoRange;
+pub use self::scoped_seq_bounded_into_range::ScopedSeqBoundedIntoRange;
 pub use self::scoped_seq_bounded_range::ScopedSeqBoundedRange;
 pub use self::scoped_seq_bounded_range_iter::ScopedSeqBoundedRangeIter;
 pub use self::scoped_set::ScopedSet;
