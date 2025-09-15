@@ -16,16 +16,49 @@ use std::fmt;
 
 /// Trait for namespace identifiers in MVCC operations.
 ///
-/// Namespaces partition data and control sequence number allocation behavior.
+/// Namespaces partition data into logical domains and control sequence number allocation behavior.
+/// Each namespace can independently decide whether operations increment the global sequence counter.
+///
+/// # Type Requirements
+/// - **Copy + Clone**: Efficient parameter passing and storage
+/// - **Ord**: Deterministic ordering for consistent iteration
+/// - **Debug**: Troubleshooting and logging support
+/// - **Send + Sync**: Thread-safe concurrent access
+/// - **Unpin + 'static**: Async compatibility and stable lifetime
+///
+/// # Sequence Number Strategy
+///
+/// The [`increments_seq()`] method controls whether insertions in this namespace
+/// advance the global sequence counter. This enables related data to share sequence
+/// numbers for consistency.
+///
+/// # Examples
+/// ```rust,ignore
+/// #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
+/// enum MyNamespace {
+///     PrimaryData,    // increments_seq() = true
+///     SecondaryIndex, // increments_seq() = false (shares seq with primary)
+/// }
+///
+/// impl ViewNamespace for MyNamespace {
+///     fn increments_seq(&self) -> bool {
+///         matches!(self, MyNamespace::PrimaryData)
+///     }
+/// }
+/// ```
+///
+/// [`increments_seq()`]: Self::increments_seq
 pub trait ViewNamespace
 where Self: Clone + Copy + Ord + fmt::Debug + Send + Sync + Unpin + 'static
 {
-    /// Whether insertions in this namespace increment the sequence number.
+    /// Whether insertions in this namespace increment the global sequence number.
     ///
-    /// Related data (like secondary indices) can share sequence numbers by returning `false`.
+    /// Primary data typically returns `true` to advance the sequence, while related
+    /// data (like secondary indices) can return `false` to share the sequence number
+    /// with their associated primary record.
     ///
-    /// # Example
-    /// Primary record: `(key, seq=5) = "value"`
-    /// Index record: `(index_key, seq=5) = key` (shares sequence)
+    /// # Example Relationship
+    /// - Primary record: `(key, seq=5) = "value"`
+    /// - Index record: `(index_key, seq=5) = key` (shares sequence with primary)
     fn increments_seq(&self) -> bool;
 }

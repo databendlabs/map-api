@@ -22,7 +22,10 @@ use crate::mvcc::table::Table;
 use crate::mvcc::value::ViewValue;
 use crate::mvcc::view_namespace::ViewNamespace;
 
-/// Commits staged changes to persistent storage.
+/// Trait for committing staged changes to persistent storage.
+///
+/// Implementors define how transactions are atomically applied to underlying data stores.
+/// All changes within a transaction are applied together or fail together.
 #[async_trait::async_trait]
 pub trait Commit<S, K, V>
 where
@@ -30,11 +33,14 @@ where
     K: ViewKey,
     V: ViewValue,
 {
-    /// Apply staged changes to underlying storage.
+    /// Atomically apply staged changes to underlying storage.
     ///
     /// # Parameters
     /// - `last_seq`: Highest sequence number in the changes
     /// - `changes`: Pending modifications organized by namespace
+    ///
+    /// # Errors
+    /// Returns `io::Error` if the commit operation fails, leaving the storage unchanged.
     async fn commit(
         &mut self,
         last_seq: InternalSeq,

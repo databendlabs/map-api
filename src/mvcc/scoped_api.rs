@@ -18,6 +18,20 @@ use crate::mvcc::ScopedSet;
 use crate::mvcc::ViewKey;
 use crate::mvcc::ViewValue;
 
+/// Combined MVCC API for namespace-scoped operations.
+///
+/// This trait combines read, write, and range operations within a single namespace,
+/// providing a unified interface for common MVCC patterns. Implementors automatically
+/// gain access to all scoped operations without namespace parameters.
+///
+/// # Auto-Implementation
+///
+/// This trait is automatically implemented for any type that provides the constituent
+/// scoped operations: [`ScopedGet`], [`ScopedSet`], and [`ScopedRange`].
+///
+/// # Type Parameters
+/// - `K`: Key type satisfying [`ViewKey`] constraints
+/// - `V`: Value type satisfying [`ViewValue`] constraints
 #[async_trait::async_trait]
 pub trait ScopedApi<K, V>
 where

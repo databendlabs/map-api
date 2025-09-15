@@ -85,17 +85,17 @@ where
         self.snapshot_seq
     }
 
-    /// Gets the value for a key upto the internal snapshot sequence(inclusive).
+    /// Retrieves the value for a key up to the snapshot sequence (inclusive).
     pub async fn get(&self, space: S, key: K) -> Result<SeqMarked<V>, io::Error> {
         self.data.get(space, key, *self.snapshot_seq).await
     }
 
-    /// Gets the value for a key upto the internal snapshot sequence(inclusive).
+    /// Retrieves values for multiple keys up to the snapshot sequence (inclusive).
     pub async fn get_many(&self, space: S, keys: Vec<K>) -> Result<Vec<SeqMarked<V>>, io::Error> {
         self.data.get_many(space, keys, *self.snapshot_seq).await
     }
 
-    /// Gets the value for a key upto the internal snapshot sequence(inclusive).
+    /// Returns a range of key-value pairs up to the snapshot sequence (inclusive).
     pub async fn range<R>(
         &self,
         space: S,

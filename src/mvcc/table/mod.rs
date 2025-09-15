@@ -33,17 +33,33 @@ pub use table_snapshot::TablesSnapshot;
 
 use crate::SeqMarked;
 
-/// A in-memory table contains multiple version of key-values
+/// In-memory table containing multiple versions of key-value pairs.
+///
+/// Each key can have multiple versions identified by sequence numbers, enabling
+/// MVCC snapshot isolation. The most recent version is stored at the top of the
+/// internal BTreeMap for efficient access.
+///
+/// # Storage Layout
+/// - Keys are paired with reverse-ordered sequence numbers for newest-first ordering
+/// - Tombstone records (deletions) are stored as `None` values
+/// - All versions of a key remain until compaction
+///
+/// # Type Parameters
+/// - `K`: Key type that must be orderable
+/// - `V`: Value type for stored data
 #[derive(Debug)]
 pub struct Table<K, V> {
-    /// Keep the most recent version of the key-value pair at the top of the map.
+    /// Stores key-value pairs with reverse sequence ordering for newest-first access.
     ///
-    /// A tombstone record does not have a value.
+    /// Structure: `(key, Reverse<sequence>) -> Option<value>`
+    /// - `Some(value)`: Regular record
+    /// - `None`: Tombstone (deletion marker)
     pub inner: BTreeMap<(K, Reverse<SeqMarked<()>>), Option<V>>,
 
-    /// The last inserted may be a tombstone.
+    /// Tracks the highest sequence number in this table.
     ///
-    /// With the implementation that insert tombstone does not increase seq, it use (seq, tombstone) to compare.
+    /// Note: The last inserted record may be a tombstone, as tombstone insertions
+    /// can increment the sequence number depending on namespace configuration.
     pub last_seq: SeqMarked<()>,
 }
 

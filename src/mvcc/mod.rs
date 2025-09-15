@@ -14,7 +14,7 @@
 
 //! Multi-Version Concurrency Control (MVCC) for versioned key-value storage.
 //!
-//! Provides **Read Committed** isolation with atomic transactions and snapshot consistency.
+//! Provides **Read Committed** isolation level with atomic transactions and snapshot consistency.
 //! Data is organized by namespaces with support for concurrent read-write operations.
 //!
 //! # Architecture
@@ -34,18 +34,20 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! // Basic transaction workflow
+//! use crate::mvcc::{Table, View};
+//!
+//! // Create table and transaction view
 //! let table = Table::new();
 //! let mut view = View::new(table);
 //!
-//! // Stage changes
+//! // Stage changes within transaction
 //! view.set(namespace, "key1".to_string(), Some("value1".to_string()));
 //! view.set(namespace, "key2".to_string(), None); // deletion
 //!
-//! // Read with staged changes visible
+//! // Read includes staged changes
 //! let current = view.get(namespace, "key1".to_string()).await?;
 //!
-//! // Atomic commit
+//! // Atomic commit of all changes
 //! let updated_table = view.commit().await?;
 //! ```
 
