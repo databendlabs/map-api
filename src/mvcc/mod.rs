@@ -51,6 +51,7 @@
 //! let updated_table = view.commit().await?;
 //! ```
 
+pub mod coalesce;
 pub mod commit;
 pub mod key;
 pub mod scoped_api;

@@ -14,6 +14,7 @@ deepsize = { version = "0.2.0" }
 futures = "0.3.24"
 futures-async-stream = { version = "^0.2.7" }
 futures-util = "0.3.24"
+itertools = { version = "0.13.0" }
 log = { version = "0.4.21", features = ["serde", "kv_unstable_std"] }
 seq-marked = { version = "0.3.3"}
 serde = { version = "1.0.164", features = ["derive", "rc"] }

@@ -60,6 +60,7 @@
 //! ```
 
 #![feature(coroutines)]
+extern crate core;
 
 use std::io;
 

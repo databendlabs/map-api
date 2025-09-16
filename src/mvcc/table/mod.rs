@@ -15,6 +15,7 @@
 pub mod errors;
 mod impl_scoped_seq_bounded_get;
 mod impl_scoped_seq_bounded_range_iter;
+mod merge;
 pub mod range_iter;
 mod table_snapshot;
 
