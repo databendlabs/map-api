@@ -149,7 +149,7 @@ where
     /// This seq will be updated to the underlaying [`Table`] when the transaction is committed.
     pub(crate) last_seq: InternalSeq,
 
-    pub(crate) base: Snapshot<S, K, V, D>,
+    pub(crate) snapshot: Snapshot<S, K, V, D>,
 }
 
 impl<S, K, V, D> fmt::Debug for View<S, K, V, D>
@@ -168,7 +168,7 @@ where
             )
             .field("changes", &self.changes)
             .field("last_seq", &self.last_seq)
-            .field("base", &self.base)
+            .field("snapshot", &self.snapshot)
             .finish()
     }
 }
@@ -180,13 +180,13 @@ where
     V: ViewValue,
     D: SeqBoundedRead<S, K, V> + Commit<S, K, V>,
 {
-    pub fn new(base: Snapshot<S, K, V, D>) -> Self {
-        let seq = base.snapshot_seq();
+    pub fn new(snapshot: Snapshot<S, K, V, D>) -> Self {
+        let seq = snapshot.snapshot_seq();
         Self {
             increase_seq_for_tombstone: false,
             changes: BTreeMap::new(),
             last_seq: seq,
-            base,
+            snapshot,
         }
     }
 
@@ -202,7 +202,7 @@ where
 
     /// Return the reference to the snapshot this view is based on.
     pub fn snapshot(&self) -> &Snapshot<S, K, V, D> {
-        &self.base
+        &self.snapshot
     }
 
     fn current_normal_seq(&self) -> SeqMarked<()> {
@@ -231,8 +231,9 @@ where
         SeqMarked::new_tombstone(*self.last_seq)
     }
 
+    #[deprecated(since = "0.4.2", note = "use snapshot() instead")]
     pub fn base(&self) -> &Snapshot<S, K, V, D> {
-        &self.base
+        &self.snapshot
     }
 
     /// Inserting a tombstone does not increase the seq, but instead, it use the last used seq.
@@ -281,7 +282,7 @@ where
             return Ok(updated);
         }
 
-        let base = self.base.get(space, key).await?;
+        let base = self.snapshot.get(space, key).await?;
 
         let compacted = compact_seq_marked_pair(updated, base);
 
@@ -339,7 +340,7 @@ where
     {
         let last_seq = self.last_seq;
 
-        let base_strm = self.base.range(space, range.clone()).await?;
+        let base_strm = self.snapshot.range(space, range.clone()).await?;
 
         let update_table = self.changes.get(&space);
         let Some(update_table) = update_table else {
@@ -362,7 +363,7 @@ where
     }
 
     pub async fn commit(self) -> Result<D, io::Error> {
-        let d = self.base.commit(self.last_seq, self.changes).await?;
+        let d = self.snapshot.commit(self.last_seq, self.changes).await?;
         Ok(d)
     }
 }
